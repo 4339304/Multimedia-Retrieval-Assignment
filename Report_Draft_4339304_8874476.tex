@@ -1,0 +1,253 @@
+% =============================================================================================
+% Multimedia Retrieval assignment - Step 1 report as sent for feedback, in ONE file.
+% All images used by the report are in the folder Images/ next to this file.
+% Compile (from the folder of this file):  ..\tools\tectonic\tectonic.exe -X compile Report_Draft_4339304_8874476.tex
+% or upload Report_Draft_4339304_8874476.tex together with the folder Images/ to Overleaf.
+% =============================================================================================
+% ---------------------------------------------------------------------------------------------
+% Preamble: compact technical-report layout (10 pt, small margins, tight spacing)
+% ---------------------------------------------------------------------------------------------
+\documentclass[10pt,a4paper]{article}
+
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage[a4paper,top=2.0cm,bottom=2.0cm,left=2.2cm,right=2.2cm]{geometry}
+\usepackage{microtype}
+
+% mathematics
+\usepackage{amsmath,amssymb}
+
+% figures and tables
+\usepackage{graphicx}
+\usepackage{adjustbox}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage[font=small,labelfont=bf,skip=3pt]{caption}
+\usepackage{subcaption}
+\usepackage{xcolor}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning}
+\usepackage{enumitem}
+\usepackage{url}
+
+% compact spacing
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{3.5pt plus 1pt}
+\linespread{1.0}
+\usepackage{titlesec}
+\titlespacing*{\section}{0pt}{12pt plus 2pt minus 2pt}{5pt plus 1pt}
+\titlespacing*{\subsection}{0pt}{9pt plus 2pt minus 2pt}{3pt plus 1pt}
+\titlespacing*{\subsubsection}{0pt}{7pt plus 2pt minus 1pt}{2pt plus 1pt}
+\titleformat{\section}{\large\bfseries}{\thesection}{0.6em}{}
+\titleformat{\subsection}{\normalsize\bfseries}{\thesubsection}{0.6em}{}
+\titleformat{\subsubsection}{\normalsize\bfseries\itshape}{\thesubsubsection}{0.6em}{}
+\setlength{\textfloatsep}{9pt plus 2pt minus 2pt}
+\setlength{\floatsep}{7pt plus 2pt minus 2pt}
+\setlength{\intextsep}{7pt plus 2pt minus 2pt}
+\renewcommand{\arraystretch}{1.08}
+\setlist{nosep,leftmargin=1.4em}
+
+% numbering: tables and figures are numbered per section (Table 2.3, Figure 1.4, ...)
+\setcounter{secnumdepth}{3}
+\usepackage{chngcntr}
+\counterwithin{table}{section}
+\counterwithin{figure}{section}
+
+% figures are found in these folders
+\graphicspath{{Images/}}
+
+% shortcuts used in the text
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\card}[1]{\lvert #1\rvert}
+
+% hyperref last
+\usepackage[hidelinks,pdfusetitle]{hyperref}
+
+
+\begin{document}
+\pagestyle{plain}
+
+\begin{center}
+{\LARGE Multimedia Retrieval Assignment}\\[6pt]
+Maria Podbylska (4339304)\\
+Bharath Kumar Sokke Prabhu (8874476)
+\end{center}
+
+First version sent for feedback.
+
+\section*{STEP 1: Reading and Viewing 3D Shape Data}
+
+\subsection*{1.1 Aim}
+The first step of the assignment was to build a basic application that can read and visualize the 3D shapes provided in the
+database. The application should be able to display a mesh using shaded rendering, optionally show its edges, and allow the user
+to rotate, zoom, and pan the model.
+
+The purpose of this step was also to become familiar with the structure and variety of the 3D database before performing further
+processing. The implementation was therefore tested on different types of shapes rather than on a single example. These
+requirements follow the official assignment description.
+
+\begin{center}
+OBJ file $\rightarrow$ Mesh loader $\rightarrow$ Vertices and faces $\rightarrow$ 3D viewer $\rightarrow$ Interactive visualization
+\end{center}
+
+\subsection*{1.2 Representation of the 3D Shapes}
+A 3D shape is represented as a mesh consisting of vertices and faces:
+\[ M=(V,F) \]
+where $V$ is the set of vertices and $F$ is the set of faces.
+
+Each vertex represents a point in three-dimensional space:
+\[ v_i=(x_i,y_i,z_i) \]
+The faces describe how these vertices are connected to form the surface of the object. For visualization, the meshes are
+represented using triangular faces.
+
+The database also provides a class label for each shape through its folder structure. For example, shapes stored in the Bicycle,
+Bird, or House folders belong to those respective classes. This class information will also be useful in later retrieval and
+evaluation steps.
+
+The axis-aligned bounding box of a shape can be described using the minimum and maximum coordinates along the three axes.
+
+\subsection*{1.3 Data Format}
+The database stores the shapes in Wavefront OBJ format. OBJ is a text-based format in which the geometry can be described using
+vertex and face definitions.
+
+The main information required for this project is:
+
+\begin{center}
+\includegraphics[width=0.75\linewidth]{OBJ_excerpt.png}
+\end{center}
+
+The v lines contain the coordinates of the vertices, while the f lines specify which vertices form each face.
+
+In the examined database files, the geometry primarily consists of vertex positions and faces. Texture coordinates, normals, and
+material information are not required for the basic viewer.
+
+The implementation uses the trimesh Python library to load the OBJ files. This provides the mesh vertices and faces in a form that
+can be directly used by the visualization system. Non-triangular faces can also be triangulated for visualization. However, the
+original face information needs to be considered separately in Step 2, where the face type of each shape must be determined.
+
+\subsection*{1.4 Design and Implementation}
+The application was implemented in Python using Trimesh for mesh loading and Plotly for interactive visualization.
+
+Trimesh was selected because it provides a straightforward way to read the OBJ files and access the vertices and faces of the mesh.
+A standalone viewer using Open3D was also implemented for fast interactive exploration, and the Kaleido library was used to export
+the rendered views as static images.
+
+For visualization, Plotly's Mesh3d representation is used to display the surface of the object. Shading provides a better
+perception of the three-dimensional structure. An optional wireframe is generated by drawing the edges of the triangular faces.
+
+The viewer supports the required interaction:
+\begin{itemize}
+  \item Rotation by dragging the model.
+  \item Zooming using the mouse wheel.
+  \item Panning using the appropriate mouse/keyboard interaction.
+  \item Wireframe display when required.
+\end{itemize}
+
+\subsection*{1.5 Mesh Loading}
+Before any shape can be viewed, it must first be loaded into a data structure by a function that turns a stored file from the
+initial format (.obj) into a triangle mesh that the rest of the application can operate on. Loading is implemented using the
+trimesh library (version 5.1.0), which provides robust parsing and returns vertex and face data as NumPy arrays, convenient for
+the numerical operations required in later steps. Two loading options were chosen on purpose. First, the result is forced into a
+triangulated mesh, so faces with more than three vertices are automatically split into triangles that the renderer can always
+handle. Second, the automatic processing was turned off, so that the raw data is preserved exactly as stored. Disabling this option
+is important to prevent silent merging of duplicate vertices or removal of degenerate faces, which could both bias later
+statistical analysis. This loading function is used consistently everywhere shapes are read in this report, including in the viewer
+described in Section 1.4 and the check in Section 1.6.
+
+\subsection*{1.6 Results}
+The implemented loader and viewer were tested using shapes from different classes, including Bicycle, Bird, Chess, Hand, House,
+and Tree. The results showed that the application was able to load and visualize shapes with different levels of geometric
+complexity. Table 1 summarizes the vertex and face counts of the six test shapes.
+
+\begin{center}
+\small
+\begin{tabular}{@{}lrr@{}}
+\toprule
+Class & Vertices & Faces \\
+\midrule
+Bicycle & 2,769 & 5,049 \\
+Bird & 233 & 462 \\
+Chess & 380 & 756 \\
+Hand & 7,929 & 15,855 \\
+House & 46,622 & 90,161 \\
+Tree & 54,223 & 36,512 \\
+\bottomrule
+\end{tabular}
+
+\captionof*{table}{Table 1. Vertex and face counts of the six shapes used to test the viewer.}
+\end{center}
+
+These shapes were selected because they represent different kinds of geometry. For example, the Bicycle contains many thin
+mechanical components, the Bird and Hand contain more organic geometry, the House contains larger architectural surfaces, and the
+Tree has a highly branching structure.
+
+Each selected shape was loaded and displayed both with shaded rendering and with the optional wireframe overlay. Renderings are
+shown in Figures 1--6, each presenting the shaded and wireframe views of the corresponding shape. The different vertex and face
+counts also provided a basic check that the loader could handle meshes with substantially different levels of complexity.
+
+The viewer successfully displayed both shaded and wireframe representations for the tested shapes. Rotation, zooming, and panning
+could also be performed interactively.
+
+In addition to the selected examples, the loader was tested on the complete database. All 2,483 OBJ files across 69 classes were
+loaded successfully, with zero loading exceptions and zero empty meshes. This provides evidence that the implemented loader works
+consistently across the database rather than only for the selected test examples. A successful load confirms that the file can be
+parsed correctly, but not that the shape itself is free of geometric issues, which will be addressed later on.
+
+The results show that the same loading and visualization pipeline can be applied to all six test cases.
+
+% \reportfig{number}{shape}{left image}{right image}{caption}   (images are in the folder Images/)
+\newcommand{\reportfig}[5]{%
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.485\linewidth]{Fig#1_#2_#3.png}\hfill
+\includegraphics[width=0.485\linewidth]{Fig#1_#2_#4.png}
+\captionsetup{labelformat=empty}
+\caption{Figure #1. #5}
+\end{figure}}
+\reportfig{1}{Bicycle}{shaded}{wireframe}{Bicycle with shaded and shaded + wireframe}
+\reportfig{2}{Bird}{shaded}{wireframe}{Bird with shaded and shaded + wireframe}
+\reportfig{3}{Chess}{wireframe}{shaded}{Chess Shaded +wireframe and Shaded}
+\reportfig{4}{Hand}{wireframe}{shaded}{Hand shaded + wireframe and Shaded}
+\reportfig{5}{House}{shaded}{wireframe}{House Shaded and Shaded + wireframe}
+\reportfig{6}{Tree}{shaded}{wireframe}{Tree Shaded and wireframe}
+
+\subsection*{1.7 Discussion}
+The implementation satisfies the main requirements of Step 1. The application can read the database's OBJ files, convert them into
+usable mesh representations, and display them interactively.
+
+Testing on shapes with different sizes and geometric structures is important because the database contains considerable variation
+in mesh resolution and shape complexity. The selected examples therefore provide a more useful test than using only one simple
+model.
+
+One important consideration for the next step is that the viewer works with triangulated mesh data, while Step 2 requires
+information about the original face type. Therefore, the preprocessing stage needs to inspect the original OBJ representation
+before triangulation when determining whether a shape contains triangles, quadrilaterals, or mixed faces.
+
+\subsection*{1.8 Conclusion}
+Step 1 resulted in a functional foundation for the 3D shape retrieval system. The implemented pipeline successfully loads OBJ
+meshes using Trimesh and visualizes them interactively using Plotly. Both shaded rendering and optional wireframe visualization are
+supported, together with rotation, zooming, and panning.
+
+The viewer was tested using six geometrically different classes, ranging from relatively small meshes such as the Bird and Chess
+models to much larger meshes such as the House and Tree models. This provides evidence that the implementation can handle
+different mesh complexities and prepares the system for the preprocessing and analysis required in Step 2.
+
+\subsection*{References}
+\begin{description}[leftmargin=2.2em,labelwidth=2em,style=sameline]
+\item[{[1]}] A. C. Telea, Multimedia Retrieval -- Assignment, Utrecht University. Available:
+  \url{https://webspace.science.uu.nl/~telea001/MR/Assignment}. The assignment specifies the requirements for reading,
+  visualizing, and testing the 3D shape database.
+\item[{[2]}] M. Dawson-Haggerty et al., Trimesh: Python library for loading and processing triangular meshes, version 5.1.0.
+  Available: \url{https://trimesh.org}. Used for loading and handling the OBJ mesh data.
+\item[{[3]}] Plotly Technologies Inc., Plotly Python Graphing Library, version 7.1.0. Available: \url{https://plotly.com/python/}.
+  Used for interactive 3D mesh visualization.
+\item[{[4]}] Open3D Development Team, Open3D, version 0.20.0. Available: \url{https://www.open3d.org}. Used for the standalone
+  mesh viewer.
+\item[{[5]}] Plotly Technologies Inc., Kaleido, version 1.4.0. Available: \url{https://github.com/plotly/Kaleido}. Used to export
+  images of the rendered shapes for this report.
+\item[{[6]}] MaxRee94, ShapeDatabase\_INFOMR, GitHub repository. Available: \url{https://github.com/MaxRee94/ShapeDatabase_INFOMR}.
+  Shape database used for this project.
+\end{description}
+
+\end{document}
