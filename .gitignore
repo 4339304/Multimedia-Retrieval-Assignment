@@ -1,0 +1,14 @@
+# shape database and generated data (too large for GitHub, recreated by the code)
+Data/*
+!Data/PUT_THE_SHAPE_DATABASE_HERE.txt
+processed/
+report/data/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Jupyter
+.ipynb_checkpoints/

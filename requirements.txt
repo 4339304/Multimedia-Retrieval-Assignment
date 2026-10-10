@@ -1,0 +1,8 @@
+trimesh==5.1.0
+numpy==2.5.3
+pandas==3.0.6
+open3d==0.20.0
+matplotlib==3.11.2
+plotly==7.1.0
+kaleido==1.4.0
+jupyter
