@@ -1,12 +1,7 @@
 % =============================================================================================
-% Multimedia Retrieval assignment - Step 1 report as sent for feedback, in ONE file.
-% All images used by the report are in the folder Images/ next to this file.
-% Compile (from the folder of this file):  ..\tools\tectonic\tectonic.exe -X compile Report_Draft_4339304_8874476.tex
-% or upload Report_Draft_4339304_8874476.tex together with the folder Images/ to Overleaf.
+% Multimedia Retrieval assignment: technical report.
+% Images used by the report: the folders Images/ and figures/step1_smooth/ next to this file.
 % =============================================================================================
-% ---------------------------------------------------------------------------------------------
-% Preamble: compact technical-report layout (10 pt, small margins, tight spacing)
-% ---------------------------------------------------------------------------------------------
 \documentclass[10pt,a4paper]{article}
 
 \usepackage[T1]{fontenc}
@@ -53,9 +48,10 @@
 \usepackage{chngcntr}
 \counterwithin{table}{section}
 \counterwithin{figure}{section}
+\counterwithin{equation}{section}
 
 % figures are found in these folders
-\graphicspath{{Images/}}
+\graphicspath{{Images/}{figures/step1_smooth/}}
 
 % shortcuts used in the text
 \newcommand{\R}{\mathbb{R}}
@@ -64,190 +60,345 @@
 % hyperref last
 \usepackage[hidelinks,pdfusetitle]{hyperref}
 
+\title{Multimedia Retrieval -- Practical Assignment}
+\author{Maria Podbylska (4339304) \and Bharath Kumar Sokke Prabhu (8874476)}
+\date{}
 
 \begin{document}
 \pagestyle{plain}
 
-\begin{center}
-{\LARGE Multimedia Retrieval Assignment}\\[6pt]
-Maria Podbylska (4339304)\\
-Bharath Kumar Sokke Prabhu (8874476)
-\end{center}
+% ---------------------------------------------------------------------------------------------
+% Title page
+% ---------------------------------------------------------------------------------------------
+\begin{titlepage}
+\centering
+\vspace*{1.5cm}
+{\normalsize Utrecht University\par}
+\vspace{3pt}
+{\normalsize Multimedia Retrieval\par}
+\vspace{\stretch{0.6}}
+\rule{0.85\linewidth}{0.6pt}\par
+\vspace{0.8cm}
+{\fontsize{30}{38}\selectfont\bfseries Practical Assignment\\ Technical Report\par}
+\vspace{1.2cm}
+{\LARGE Maria Podbylska (4339304)\par}
+\vspace{8pt}
+{\LARGE Bharath Kumar Sokke Prabhu (8874476)\par}
+\vspace{0.9cm}
+\rule{0.85\linewidth}{0.6pt}\par
+\vspace{\stretch{2}}
+{\normalsize Lecturer: prof.\ dr.\ Alex Telea\par}
+\vspace{4pt}
+{\normalsize \ifnum\day<10 0\fi\the\day.\ifnum\month<10 0\fi\the\month.\the\year\par}
+\vspace*{1cm}
+\end{titlepage}
 
-First version sent for feedback.
+\section*{Recent Changes}
+\textbf{General:} changes to the whole report.
+\begin{itemize}
+  \item \textbf{Format:} the report is now written in LaTeX. The layout was made more compact.
+  \item \textbf{Report structure:} a title page, a table of contents and numbered sections were added. Figures, tables and
+        equations are now numbered and referenced in the text.
+  \item \textbf{References:} the references are numbered in the order in which they are cited and are listed on a separate
+        last page.
+  \item \textbf{Introduction:} sections about the purpose and the structure of the report were added (Section~\ref{sec:intro}).
+  \item \textbf{Mathematical notation:} formal definitions of the mesh, the face type, the axis-aligned bounding box, the
+        face orientation and the signed volume were added, together with a table of all symbols used in the report (Section~\ref{sec:notation}).
+        The former Section~1.2 is merged into this section.
+  \item \textbf{Software and tools:} a table with the exact versions and sources of all tools was added
+        (Section~\ref{sec:tools}), and every tool now has a reference. Version numbers were removed from the running text.
+\end{itemize}
+\textbf{Step 1:} the first version was edited.
+\begin{itemize}
+  \item \textbf{Text:} the text was revised to be more concise.
+  \item \textbf{Face type:} the face type is now measured: all 2,483 shapes consist of triangles only
+        (Section~\ref{sec:loading}). Table~\ref{tab:six} now also lists the file and the face type of each shape.
+  \item \textbf{Shading of the Hand shape:} the coloured patches in the former Figure~4 were investigated. The patches are an
+        artifact of flat shading. All shapes are now rendered with smooth shading (Section~\ref{sec:results1},
+        Figure~\ref{fig:handshading}).
+  \item \textbf{Figures:} each figure shows the shaded and wireframe views as subfigures (a) and (b) in the same order. The
+        captions name the file of the shape and describe what is shown.
+\end{itemize}
+\textbf{Step 2:} the first version was added.
+\clearpage
 
-\section*{STEP 1: Reading and Viewing 3D Shape Data}
+{\small\tableofcontents}
+\clearpage
 
-\subsection*{1.1 Aim}
-The first step of the assignment was to build a basic application that can read and visualize the 3D shapes provided in the
-database. The application should be able to display a mesh using shaded rendering, optionally show its edges, and allow the user
-to rotate, zoom, and pan the model.
+\section{Introduction}\label{sec:intro}
 
-The purpose of this step was also to become familiar with the structure and variety of the 3D database before performing further
-processing. The implementation was therefore tested on different types of shapes rather than on a single example. These
-requirements follow the official assignment description.
+\subsection{Purpose and Scope}
+This report documents the design and implementation of a content-based 3D shape retrieval system, developed for the Multimedia
+Retrieval course at Utrecht University~[1]. Given a query shape, the system returns the shapes of a database that are most
+similar to it. The database contains 2,483 shapes in 69 classes, stored as Wavefront OBJ files~[2].
 
-\begin{center}
-OBJ file $\rightarrow$ Mesh loader $\rightarrow$ Vertices and faces $\rightarrow$ 3D viewer $\rightarrow$ Interactive visualization
-\end{center}
+\subsection{Structure of the Report}
+Section~\ref{sec:step1} describes how the shapes are read from disk and visualized, and Section~\ref{sec:step2} describes
+the analysis and preprocessing of the shape database. The rest of this section introduces the mathematical notation
+(Section~\ref{sec:notation}) and the software that was used (Section~\ref{sec:tools}).
 
-\subsection*{1.2 Representation of the 3D Shapes}
-A 3D shape is represented as a mesh consisting of vertices and faces:
-\[ M=(V,F) \]
-where $V$ is the set of vertices and $F$ is the set of faces.
+\subsection{Mathematical Notation}\label{sec:notation}
 
-Each vertex represents a point in three-dimensional space:
-\[ v_i=(x_i,y_i,z_i) \]
-The faces describe how these vertices are connected to form the surface of the object. For visualization, the meshes are
-represented using triangular faces.
+\paragraph{Shapes.}
+A shape is represented by a mesh $M=(V,F)$, where
+\begin{equation}
+  V=\{v_i\},\quad 1\le i\le N_V,\quad v_i=(x_i,y_i,z_i)\in\R^3
+  \label{eq:vertices}
+\end{equation}
+is the set of vertices and
+\begin{equation}
+  F=\{f_j\},\quad 1\le j\le N_F,\quad f_j=(v_j^1,\dots,v_j^{k_j}),\quad 1\le v_j^l\le N_V
+  \label{eq:faces}
+\end{equation}
+is the set of faces. A face is a tuple of $k_j=\card{f_j}\ge 3$ vertex indices. A face with $k_j=3$ is a triangle,
+$f_j=(v_j^1,v_j^2,v_j^3)$, and a face with $k_j=4$ is a quad. The face type of a mesh is
+$\tau(M)=\textit{triangles}$ if $k_j=3$ for all $j$, $\tau(M)=\textit{quads}$ if $k_j=4$ for all $j$, and
+$\tau(M)=\textit{mixed}$ otherwise. The face type is not assumed but measured for every shape (Section~\ref{sec:step2}).
+The database also provides a class label $c(M)\in\mathcal{C}$, $\card{\mathcal{C}}=69$, for each shape through its folder
+structure. For example, shapes stored in the Bicycle, Bird, or House folders belong to those respective classes. The class labels are
+used later to evaluate the retrieval results.
 
-The database also provides a class label for each shape through its folder structure. For example, shapes stored in the Bicycle,
-Bird, or House folders belong to those respective classes. This class information will also be useful in later retrieval and
-evaluation steps.
+\paragraph{Axis-Aligned Bounding Box.}
+The axis-aligned bounding box (AABB) of $M$ is the smallest box with faces parallel to the coordinate planes that contains all
+vertices of $M$:
+\begin{gather}
+  B(M)=[x_{\min},x_{\max}]\times[y_{\min},y_{\max}]\times[z_{\min},z_{\max}],\label{eq:aabb}\\
+  x_{\min}=\min_{1\le i\le N_V}x_i,\quad y_{\min}=\min_{1\le i\le N_V}y_i,\quad z_{\min}=\min_{1\le i\le N_V}z_i,\notag\\
+  x_{\max}=\max_{1\le i\le N_V}x_i,\quad y_{\max}=\max_{1\le i\le N_V}y_i,\quad z_{\max}=\max_{1\le i\le N_V}z_i .\notag
+\end{gather}
+Its diagonal is $d(M)=\lVert(x_{\max}-x_{\min},\,y_{\max}-y_{\min},\,z_{\max}-z_{\min})\rVert$.
 
-The axis-aligned bounding box of a shape can be described using the minimum and maximum coordinates along the three axes.
+\paragraph{Orientation.}
+The directed edges of a face $f_j$ are $(v_j^l,v_j^{l+1})$, with $l$ taken modulo $k_j$. Two faces that share an edge are
+consistently oriented if they traverse the shared edge in opposite directions; a mesh in which this holds for all shared edges
+is consistently oriented. The unit normal of a triangle $f_j$ is
+\begin{equation}
+  n_j=\frac{(v_j^2-v_j^1)\times(v_j^3-v_j^1)}{\lVert(v_j^2-v_j^1)\times(v_j^3-v_j^1)\rVert}.
+  \label{eq:normal}
+\end{equation}
+For a triangle mesh, the signed volume is
+\begin{equation}
+  \mathrm{Vol}(M)=\frac16\sum_{j=1}^{N_F} v_j^1\cdot\big(v_j^2\times v_j^3\big).
+  \label{eq:signedvolume}
+\end{equation}
+For a closed, consistently oriented mesh, $\mathrm{Vol}(M)>0$ if the normals point outwards and $\mathrm{Vol}(M)<0$ if they
+point inwards.
 
-\subsection*{1.3 Data Format}
+\paragraph{Overview.}
+Table~\ref{tab:notation} lists all symbols used in the report, together with the section in which they are defined.
+
+\begin{table}[htbp]\centering\small
+\begin{tabular}{@{}p{0.30\linewidth}p{0.55\linewidth}l@{}}\toprule
+Symbol & Meaning & Section\\\midrule
+$M=(V,F)$, $N_V$, $N_F$ & mesh, number of vertices, number of faces & \ref{sec:notation}\\
+$v_i=(x_i,y_i,z_i)$, $f_j$, $k_j$ & vertex, face, number of corners of a face & \ref{sec:notation}\\
+$\tau(M)$, $c(M)$, $\mathcal{C}$ & face type, class label, set of classes & \ref{sec:notation}\\
+$B(M)$, $d(M)$ & axis-aligned bounding box and its diagonal & \ref{sec:notation}\\
+$n_j$ & unit normal of triangle $f_j$ & \ref{sec:notation}\\
+$\mathrm{Vol}(M)$ & signed volume & \ref{sec:notation}\\
+$\bar v$ & barycenter of the shape & ?\\
+$\lambda_1\ge\lambda_2\ge\lambda_3$, $e_1,e_2,e_3$ & eigenvalues and eigenvectors of the vertex covariance matrix & ?\\
+\bottomrule\end{tabular}
+\caption{Notation used in this report.}\label{tab:notation}
+\end{table}
+
+\subsection{Software and Tools}\label{sec:tools}
+The system is implemented in Python. All libraries were installed from the Python Package Index (PyPI) with \texttt{pip} into a
+virtual environment, on Windows~11. Table~\ref{tab:tools} lists the exact versions and the source of every tool.
+
+\begin{table}[htbp]\centering\small
+\begin{tabular}{@{}llp{0.33\linewidth}l@{}}\toprule
+Tool & Version & Use & Source\\\midrule
+Python~[3]     & 3.12.10 & programming language & \url{https://www.python.org}\\
+trimesh~[4]    & 5.1.0   & loading OBJ files, mesh processing & \url{https://trimesh.org}\\
+NumPy~[5]      & 2.5.3   & numerical arrays & \url{https://numpy.org}\\
+pandas~[6]     & 3.0.6   & tables of per-shape statistics & \url{https://pandas.pydata.org}\\
+Plotly~[7]     & 7.1.0   & interactive 3D viewer & \url{https://plotly.com/python}\\
+Kaleido~[8]    & 1.4.0   & export of rendered views as images & \url{https://github.com/plotly/Kaleido}\\
+Open3D~[9]     & 0.20.0  & standalone viewer, mesh resampling & \url{https://www.open3d.org}\\
+Matplotlib~[10] & 3.11.2 & histograms and plots & \url{https://matplotlib.org}\\
+Tectonic~[11]  & 0.17.0  & compiling this report (LaTeX) & \url{https://tectonic-typesetting.github.io}\\
+\bottomrule\end{tabular}
+\caption{Software used, with exact versions and sources.}\label{tab:tools}
+\end{table}
+
+\section{Step 1: Reading and Viewing 3D Shape Data}\label{sec:step1}
+
+\subsection{Aim}
+The goal of this step is an application that reads the 3D shapes of the database and displays them. A mesh is shown with shaded
+rendering, optionally with its edges drawn, and the user can rotate, zoom and pan the view.
+
+The application is also a way to get to know the structure and variety of the database before any further processing. It was
+therefore tested on several different shapes rather than on a single example. Figure~\ref{fig:pipeline1} shows the pipeline.
+
+\begin{figure}[htbp]\centering
+\small OBJ file $\rightarrow$ Mesh loader $\rightarrow$ Vertices and faces $\rightarrow$ 3D viewer $\rightarrow$ Interactive visualization
+\caption{Pipeline of the reading and viewing application.}\label{fig:pipeline1}
+\end{figure}
+
+\subsection{Data Format}
 The database stores the shapes in Wavefront OBJ format. OBJ is a text-based format in which the geometry can be described using
 vertex and face definitions.
 
-The main information required for this project is:
+Figure~\ref{fig:obj} shows an excerpt of such a file.
 
-\begin{center}
+\begin{figure}[htbp]\centering
 \includegraphics[width=0.75\linewidth]{OBJ_excerpt.png}
-\end{center}
+\caption{Excerpt of an OBJ file with vertex (\texttt{v}) and face (\texttt{f}) lines.}\label{fig:obj}
+\end{figure}
 
-The v lines contain the coordinates of the vertices, while the f lines specify which vertices form each face.
+The v lines contain the coordinates $(x_i,y_i,z_i)$ of the vertices $v_i$, while the f lines specify which vertices form each
+face $f_j$.
 
-In the examined database files, the geometry primarily consists of vertex positions and faces. Texture coordinates, normals, and
-material information are not required for the basic viewer.
+The database files consist mainly of vertex and face lines. Texture coordinates, normals and materials are not used by the
+viewer.
 
-The implementation uses the trimesh Python library to load the OBJ files. This provides the mesh vertices and faces in a form that
-can be directly used by the visualization system. Non-triangular faces can also be triangulated for visualization. However, the
-original face information needs to be considered separately in Step 2, where the face type of each shape must be determined.
+\subsection{Design and Implementation}\label{sec:design1}
+The application is written in Python and uses trimesh~[4] for loading the meshes and Plotly~[7] for the interactive view.
+The trimesh library was chosen because it reads OBJ files directly and gives access to the vertices and faces as NumPy arrays.
+In addition, a standalone viewer based on Open3D~[9] was written for fast exploration, and Kaleido~[8] was used to export
+rendered views as images.
 
-\subsection*{1.4 Design and Implementation}
-The application was implemented in Python using Trimesh for mesh loading and Plotly for interactive visualization.
+The surface is displayed with Plotly's \texttt{Mesh3d}. Shading makes the three-dimensional structure easier to see. Smooth
+shading is used, in which the colour is interpolated from normals averaged at the vertices, because flat shading of dense meshes
+produces visual artifacts (Section~\ref{sec:results1}). The optional wireframe is drawn from the edges of the faces.
 
-Trimesh was selected because it provides a straightforward way to read the OBJ files and access the vertices and faces of the mesh.
-A standalone viewer using Open3D was also implemented for fast interactive exploration, and the Kaleido library was used to export
-the rendered views as static images.
-
-For visualization, Plotly's Mesh3d representation is used to display the surface of the object. Shading provides a better
-perception of the three-dimensional structure. An optional wireframe is generated by drawing the edges of the triangular faces.
-
-The viewer supports the required interaction:
+The viewer supports the following interaction:
 \begin{itemize}
-  \item Rotation by dragging the model.
-  \item Zooming using the mouse wheel.
-  \item Panning using the appropriate mouse/keyboard interaction.
-  \item Wireframe display when required.
+  \item rotation by dragging the model;
+  \item zooming with the mouse wheel;
+  \item panning with the mouse and keyboard;
+  \item switching the wireframe on and off.
 \end{itemize}
 
-\subsection*{1.5 Mesh Loading}
-Before any shape can be viewed, it must first be loaded into a data structure by a function that turns a stored file from the
-initial format (.obj) into a triangle mesh that the rest of the application can operate on. Loading is implemented using the
-trimesh library (version 5.1.0), which provides robust parsing and returns vertex and face data as NumPy arrays, convenient for
-the numerical operations required in later steps. Two loading options were chosen on purpose. First, the result is forced into a
-triangulated mesh, so faces with more than three vertices are automatically split into triangles that the renderer can always
-handle. Second, the automatic processing was turned off, so that the raw data is preserved exactly as stored. Disabling this option
-is important to prevent silent merging of duplicate vertices or removal of degenerate faces, which could both bias later
-statistical analysis. This loading function is used consistently everywhere shapes are read in this report, including in the viewer
-described in Section 1.4 and the check in Section 1.6.
+\subsection{Mesh Loading}\label{sec:loading}
+All shapes are loaded by one function that reads an OBJ file with trimesh and returns the mesh $M=(V,F)$ as NumPy arrays.
+Two loading options are set explicitly. First, the result is forced into a triangle mesh, so that faces with more than three
+vertices would be split into triangles that the renderer can display. Second, the automatic processing of trimesh is switched
+off, so that the data is kept exactly as stored in the file. Otherwise duplicate vertices would be merged and degenerate faces
+removed without notice, which would distort the statistics of Section~\ref{sec:step2}. The same function is used for every
+shape in this report.
 
-\subsection*{1.6 Results}
-The implemented loader and viewer were tested using shapes from different classes, including Bicycle, Bird, Chess, Hand, House,
-and Tree. The results showed that the application was able to load and visualize shapes with different levels of geometric
-complexity. Table 1 summarizes the vertex and face counts of the six test shapes.
+Because triangulation during loading would hide the original face type $\tau(M)$, the face type is determined separately, by
+reading the \texttt{f} lines of the OBJ files directly (Section~\ref{sec:step2}). All 2,483 shapes consist of triangles only,
+so the triangulation never changes a mesh.
 
-\begin{center}
-\small
-\begin{tabular}{@{}lrr@{}}
+\subsection{Results}\label{sec:results1}
+The loader and the viewer were tested with one shape from each of six classes: Bicycle, Bird, Chess, Hand, House and Tree.
+Table~\ref{tab:six} lists their vertex and face counts.
+
+\begin{table}[htbp]\centering\small
+\begin{tabular}{@{}llrrl@{}}
 \toprule
-Class & Vertices & Faces \\
+Class & File & $N_V$ & $N_F$ & $\tau(M)$ \\
 \midrule
-Bicycle & 2,769 & 5,049 \\
-Bird & 233 & 462 \\
-Chess & 380 & 756 \\
-Hand & 7,929 & 15,855 \\
-House & 46,622 & 90,161 \\
-Tree & 54,223 & 36,512 \\
+Bicycle & D00016 & 2,769 & 5,049 & triangles \\
+Bird & D00089 & 233 & 462 & triangles \\
+Chess & D01017 & 380 & 756 & triangles \\
+Hand & D01006 & 7,929 & 15,855 & triangles \\
+House & D00001 & 46,622 & 90,161 & triangles \\
+Tree & D00096 & 54,223 & 36,512 & triangles \\
 \bottomrule
 \end{tabular}
+\caption{Number of vertices $N_V$, number of faces $N_F$ and face type $\tau(M)$ of the six shapes used to test the viewer.}
+\label{tab:six}
+\end{table}
 
-\captionof*{table}{Table 1. Vertex and face counts of the six shapes used to test the viewer.}
-\end{center}
+The shapes were chosen because their geometry differs: the Bicycle has many thin mechanical parts, the Bird and the Hand are
+organic shapes, the House has large flat surfaces, and the Tree branches strongly. Their sizes range from 233 to 54,223 vertices.
 
-These shapes were selected because they represent different kinds of geometry. For example, the Bicycle contains many thin
-mechanical components, the Bird and Hand contain more organic geometry, the House contains larger architectural surfaces, and the
-Tree has a highly branching structure.
+Figures~\ref{fig:bicycle}--\ref{fig:tree} show each shape shaded and with the wireframe overlay. All six shapes could be
+rotated, zoomed and panned without problems.
 
-Each selected shape was loaded and displayed both with shaded rendering and with the optional wireframe overlay. Renderings are
-shown in Figures 1--6, each presenting the shaded and wireframe views of the corresponding shape. The different vertex and face
-counts also provided a basic check that the loader could handle meshes with substantially different levels of complexity.
+The loader was also run on the whole database. All 2,483 OBJ files in 69 classes were loaded without exceptions, and none of
+the meshes was empty. This only shows that the files can be parsed, not that the meshes are free of geometric problems; these
+are analysed in Section~\ref{sec:step2}.
 
-The viewer successfully displayed both shaded and wireframe representations for the tested shapes. Rotation, zooming, and panning
-could also be performed interactively.
-
-In addition to the selected examples, the loader was tested on the complete database. All 2,483 OBJ files across 69 classes were
-loaded successfully, with zero loading exceptions and zero empty meshes. This provides evidence that the implemented loader works
-consistently across the database rather than only for the selected test examples. A successful load confirms that the file can be
-parsed correctly, but not that the shape itself is free of geometric issues, which will be addressed later on.
-
-The results show that the same loading and visualization pipeline can be applied to all six test cases.
-
-% \reportfig{number}{shape}{left image}{right image}{caption}   (images are in the folder Images/)
-\newcommand{\reportfig}[5]{%
-\begin{figure}[htbp]
-\centering
-\includegraphics[width=0.485\linewidth]{Fig#1_#2_#3.png}\hfill
-\includegraphics[width=0.485\linewidth]{Fig#1_#2_#4.png}
-\captionsetup{labelformat=empty}
-\caption{Figure #1. #5}
+% \reportfig{shape}{label}{caption}   (images are in the folder figures/step1_smooth/)
+\newcommand{\reportfig}[3]{%
+\begin{figure}[htbp]\centering
+\begin{subfigure}{0.48\linewidth}\centering\includegraphics[width=\linewidth]{#1_shaded.png}\caption{shaded}\end{subfigure}\hfill
+\begin{subfigure}{0.48\linewidth}\centering\includegraphics[width=\linewidth]{#1_wireframe.png}\caption{shaded with wireframe}\end{subfigure}
+\caption{#3}\label{#2}
 \end{figure}}
-\reportfig{1}{Bicycle}{shaded}{wireframe}{Bicycle with shaded and shaded + wireframe}
-\reportfig{2}{Bird}{shaded}{wireframe}{Bird with shaded and shaded + wireframe}
-\reportfig{3}{Chess}{wireframe}{shaded}{Chess Shaded +wireframe and Shaded}
-\reportfig{4}{Hand}{wireframe}{shaded}{Hand shaded + wireframe and Shaded}
-\reportfig{5}{House}{shaded}{wireframe}{House Shaded and Shaded + wireframe}
-\reportfig{6}{Tree}{shaded}{wireframe}{Tree Shaded and wireframe}
+\reportfig{Bicycle}{fig:bicycle}{Bicycle (D00016), a mechanical shape with many thin parts: (a) smooth shading, (b) with the wireframe drawn on top.}
+\reportfig{Bird}{fig:bird}{Bird (D00089), the smallest of the six test shapes (233 vertices): (a) smooth shading, (b) with the wireframe drawn on top.}
+\reportfig{Chess}{fig:chess}{Chess piece (D01017), a small rotationally symmetric shape: (a) smooth shading, (b) with the wireframe drawn on top.}
+\reportfig{Hand}{fig:hand}{Hand (D01006), an organic shape with a dense, irregular mesh: (a) smooth shading, (b) with the wireframe drawn on top.}
+\reportfig{House}{fig:house}{House (D00001), an architectural shape with large flat surfaces: (a) smooth shading, (b) with the wireframe drawn on top.}
+\reportfig{Tree}{fig:tree}{Tree (D00096), the largest of the six test shapes (54,223 vertices), with a strongly branching structure: (a) smooth shading, (b) with the wireframe drawn on top.}
 
-\subsection*{1.7 Discussion}
-The implementation satisfies the main requirements of Step 1. The application can read the database's OBJ files, convert them into
-usable mesh representations, and display them interactively.
+\paragraph{Shading of the Hand Shape.}
+With flat shading, in which every triangle receives one colour computed from its normal $n_j$, the Hand shows irregular dark
+patches (Figure~\ref{fig:handshading}a). Such patches are typical for inconsistently oriented faces, whose normals point to the
+inside of the surface, so the orientation of the Hand mesh was checked. The mesh is consistently oriented: none of its 23,782 edges is
+traversed in the same direction by its two faces, and its signed volume (Eq.~\eqref{eq:signedvolume}) is positive, which means that the normals point
+outwards. As an additional test, the orientation of every face was reversed; the flat-shaded image remains the same
+(Figure~\ref{fig:handshading}b), so the patches do not depend on the face orientation. They are an artifact of flat shading
+in the renderer for dense meshes with many small triangles. With smooth shading the surface is displayed correctly
+(Figure~\ref{fig:handshading}c), and smooth shading is therefore used for all figures in this report.
 
-Testing on shapes with different sizes and geometric structures is important because the database contains considerable variation
-in mesh resolution and shape complexity. The selected examples therefore provide a more useful test than using only one simple
-model.
+Inconsistent orientation does occur elsewhere in the database: 693 of the 2,483 shapes (28\,\%), including the Bicycle and
+the House of Table~\ref{tab:six}, contain inconsistently oriented faces. These will be reoriented during preprocessing
+(Section~\ref{sec:step2}).
 
-One important consideration for the next step is that the viewer works with triangulated mesh data, while Step 2 requires
-information about the original face type. Therefore, the preprocessing stage needs to inspect the original OBJ representation
-before triangulation when determining whether a shape contains triangles, quadrilaterals, or mixed faces.
+\begin{figure}[htbp]\centering
+\begin{subfigure}{0.32\linewidth}\centering\includegraphics[width=\linewidth]{hand_flat_crop.png}\caption{flat shading}\end{subfigure}\hfill
+\begin{subfigure}{0.32\linewidth}\centering\includegraphics[width=\linewidth]{hand_flat_reversed_crop.png}\caption{flat, all faces reversed}\end{subfigure}\hfill
+\begin{subfigure}{0.32\linewidth}\centering\includegraphics[width=\linewidth]{hand_smooth_crop.png}\caption{smooth shading}\end{subfigure}
+\caption{The Hand shape (D01006): (a) flat shading shows dark patches; (b) the patches stay the same when all faces are reversed, so they are not caused by the face orientation; (c) smooth shading shows the surface correctly.}\label{fig:handshading}
+\end{figure}
 
-\subsection*{1.8 Conclusion}
-Step 1 resulted in a functional foundation for the 3D shape retrieval system. The implemented pipeline successfully loads OBJ
-meshes using Trimesh and visualizes them interactively using Plotly. Both shaded rendering and optional wireframe visualization are
-supported, together with rotation, zooming, and panning.
+\subsection{Discussion}
+The application reads the OBJ files of the database, converts them into the mesh representation $M=(V,F)$, and displays them
+interactively. The same loading function is used for the viewer and for the test on the whole database, so both rely on
+exactly the same data.
 
-The viewer was tested using six geometrically different classes, ranging from relatively small meshes such as the Bird and Chess
-models to much larger meshes such as the House and Tree models. This provides evidence that the implementation can handle
-different mesh complexities and prepares the system for the preprocessing and analysis required in Step 2.
+Testing with shapes of very different size and structure was useful, because the database varies strongly in mesh resolution
+and complexity: the six test shapes alone range from 233 to 54,223 vertices. A single simple model would not have revealed
+problems such as the shading artifacts of the Hand, which only appear for dense meshes with many small triangles.
 
-\subsection*{References}
-\begin{description}[leftmargin=2.2em,labelwidth=2em,style=sameline]
+The viewer works on triangulated data, so the original face type cannot be read from the loaded mesh. For the analysis of the
+database it is therefore determined from the OBJ files directly (Section~\ref{sec:loading}). In the same way, a successful load
+says nothing about the quality of a mesh. Problems such as inconsistent face orientation, duplicate vertices or degenerate
+faces have to be detected separately, which is done in Section~\ref{sec:step2}.
+
+\subsection{Conclusion}
+The application loads OBJ meshes with trimesh and displays them interactively with Plotly. It supports shaded rendering with an
+optional wireframe, together with rotation, zooming and panning. Smooth shading is used, because flat shading produced
+misleading artifacts on dense meshes.
+
+The viewer was tested on six shapes from different classes, from small meshes such as the Bird and the Chess piece to much
+larger meshes such as the House and the Tree, and the loader reads all 2,483 shapes of the database without errors. The
+application is used to inspect the shapes during the preprocessing described in Section~\ref{sec:step2}.
+
+\section{Step 2: Preprocessing and Cleaning}\label{sec:step2}
+
+\clearpage
+\section*{References}
+\addcontentsline{toc}{section}{References}
+\begin{description}[leftmargin=2.2em,labelwidth=2em,style=sameline]\sloppy
 \item[{[1]}] A. C. Telea, Multimedia Retrieval -- Assignment, Utrecht University. Available:
-  \url{https://webspace.science.uu.nl/~telea001/MR/Assignment}. The assignment specifies the requirements for reading,
-  visualizing, and testing the 3D shape database.
-\item[{[2]}] M. Dawson-Haggerty et al., Trimesh: Python library for loading and processing triangular meshes, version 5.1.0.
-  Available: \url{https://trimesh.org}. Used for loading and handling the OBJ mesh data.
-\item[{[3]}] Plotly Technologies Inc., Plotly Python Graphing Library, version 7.1.0. Available: \url{https://plotly.com/python/}.
-  Used for interactive 3D mesh visualization.
-\item[{[4]}] Open3D Development Team, Open3D, version 0.20.0. Available: \url{https://www.open3d.org}. Used for the standalone
-  mesh viewer.
-\item[{[5]}] Plotly Technologies Inc., Kaleido, version 1.4.0. Available: \url{https://github.com/plotly/Kaleido}. Used to export
-  images of the rendered shapes for this report.
-\item[{[6]}] MaxRee94, ShapeDatabase\_INFOMR, GitHub repository. Available: \url{https://github.com/MaxRee94/ShapeDatabase_INFOMR}.
+  \url{https://webspace.science.uu.nl/~telea001/MR/Assignment}.
+\item[{[2]}] MaxRee94, ShapeDatabase\_INFOMR, GitHub repository. Available: \url{https://github.com/MaxRee94/ShapeDatabase_INFOMR}.
   Shape database used for this project.
+\item[{[3]}] Python Software Foundation, Python Language Reference, version 3.12.10. Available: \url{https://www.python.org}.
+\item[{[4]}] M. Dawson-Haggerty et al., Trimesh: Python library for loading and processing triangular meshes, version 5.1.0.
+  Available: \url{https://trimesh.org}. Used for loading and handling the OBJ mesh data.
+\item[{[5]}] C. R. Harris et al., Array programming with NumPy, \emph{Nature}, 585:357--362, 2020. NumPy version 2.5.3. Available:
+  \url{https://numpy.org}.
+\item[{[6]}] W. McKinney, Data structures for statistical computing in Python, \emph{Proceedings of the 9th Python in Science
+  Conference}, 56--61, 2010. pandas version 3.0.6. Available: \url{https://pandas.pydata.org}.
+\item[{[7]}] Plotly Technologies Inc., Plotly Python Graphing Library, version 7.1.0. Available: \url{https://plotly.com/python/}.
+  Used for interactive 3D mesh visualization.
+\item[{[8]}] Plotly Technologies Inc., Kaleido, version 1.4.0. Available: \url{https://github.com/plotly/Kaleido}. Used to export
+  images of the rendered shapes for this report.
+\item[{[9]}] Open3D Development Team, Open3D, version 0.20.0. Available: \url{https://www.open3d.org}. Used for the standalone
+  mesh viewer.
+\item[{[10]}] J. D. Hunter, Matplotlib: A 2D graphics environment, \emph{Computing in Science \& Engineering}, 9(3):90--95,
+  2007. Matplotlib version 3.11.2. Available: \url{https://matplotlib.org}.
+\item[{[11]}] The Tectonic Project, Tectonic: a modernized, complete, self-contained TeX/LaTeX engine, version 0.17.0. Available:
+  \url{https://tectonic-typesetting.github.io}.
 \end{description}
 
 \end{document}
