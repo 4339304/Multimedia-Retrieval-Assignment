@@ -1,5 +1,5 @@
 trimesh==5.1.0
-numpy==2.5.3
+numpy==2.2.6
 pandas==3.0.6
 open3d==0.20.0
 matplotlib==3.11.2

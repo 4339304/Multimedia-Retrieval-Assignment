@@ -374,6 +374,335 @@ application is used to inspect the shapes during the preprocessing described in 
 
 \section{Step 2: Preprocessing and Cleaning}\label{sec:step2}
 
+\subsection{Aim and Overview}
+
+The purpose of Step 2 is to prepare the 3D shape database for the later retrieval
+stages. The original models have different resolutions and can contain geometric
+irregularities. Comparing them directly would therefore make later measurements less
+consistent. We first examined the database, then cleaned and resampled the meshes to
+obtain a more uniform representation. Finally, every processed shape was translated
+and scaled to a common coordinate system.
+
+The preprocessing was applied to the complete database of 2,483 OBJ files. The
+main output is a set of refined meshes with approximately 5,000--10,000 vertices
+per shape, followed by a normalized version of every mesh. Figure~\ref{fig:step2pipeline}
+summarizes the workflow.
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[
+  node distance=0.55cm,
+  stage/.style={draw, rounded corners, align=center, text width=0.78\linewidth,
+                minimum height=0.7cm, inner sep=5pt},
+  arrow/.style={-{Stealth[length=2mm]}, thick}
+]
+\node[stage] (input) {Original database\\2,483 Wavefront OBJ meshes};
+\node[stage, below=of input] (scan) {Step 2.1--2.2: scan files and collect mesh statistics};
+\node[stage, below=of scan] (clean) {Clean mesh data and check face orientation};
+\node[stage, below=of clean] (sample) {Step 2.3: resample meshes to 5,000--10,000 vertices};
+\node[stage, below=of sample] (check) {Step 2.4: check processing logs and inspect meshes};
+\node[stage, below=of check] (norm) {Step 2.5: centre at the origin and scale the largest extent to 1};
+\node[stage, below=of norm] (output) {Processed database\\2,483 refined and 2,483 normalized meshes};
+\draw[arrow] (input) -- (scan);
+\draw[arrow] (scan) -- (clean);
+\draw[arrow] (clean) -- (sample);
+\draw[arrow] (sample) -- (check);
+\draw[arrow] (check) -- (norm);
+\draw[arrow] (norm) -- (output);
+\end{tikzpicture}
+\caption{Overview of the preprocessing pipeline implemented for Step 2.}
+\label{fig:step2pipeline}
+\end{figure}
+
+\subsection{Database Inspection and Initial Statistics}
+
+The database contains 2,483 shapes organized into 69 class folders. The folder name
+provides the class label, while each model is stored as an OBJ file. As in Step 1,
+the vertex and face records were read from the files. The face type was checked from
+the original face definitions rather than inferred from a mesh that might already
+have been triangulated by a loading library.
+
+All 2,483 shapes were found to contain triangular faces. This is useful because the
+same basic face representation can be used throughout the preprocessing pipeline.
+However, a file being readable does not automatically mean that its mesh is clean:
+the number of vertices varies considerably, and some meshes can contain duplicate
+vertices, degenerate geometry, or inconsistent face orientation. These properties
+were therefore considered separately from successful file loading.
+
+\begin{table}[htbp]
+\centering
+\small
+\begin{tabular}{@{}lr@{}}
+\toprule
+Initial database check & Result \\
+\midrule
+Number of shapes scanned & 2,483 \\
+Number of classes & 69 \\
+Shapes with triangular faces & 2,483 (100\%) \\
+Shapes with a different face type & 0 \\
+OBJ files successfully scanned & 2,483 \\
+\bottomrule
+\end{tabular}
+\caption{Results of the initial scan of the shape database.}
+\label{tab:step2initial}
+\end{table}
+
+\subsection{Mesh Cleaning and Orientation}
+
+Before resampling, the mesh data was checked and cleaned where necessary. Cleaning
+is important because repeated vertices and degenerate faces can affect geometric
+measurements and make later processing less reliable. The preprocessing log records
+the original vertex count, the count after cleaning, the output count, and the
+action taken for each model.
+
+Face orientation was also considered. In a consistently oriented closed triangle
+mesh, neighbouring faces traverse a shared edge in opposite directions. When this
+condition is not satisfied, the surface normals may disagree locally. The initial
+inspection in Step 1 found orientation inconsistencies in part of the database, so
+orientation was treated as a separate quality check rather than assuming that all
+input meshes were already correct.
+
+The implementation's log reported successful processing for all 2,483 meshes in
+the full database. The orientation check passed for 2,420 of the 2,483 full-database
+meshes. This result should be interpreted as a diagnostic: successful resampling and
+a successful orientation check are different properties, and the remaining meshes
+should not be described as consistently oriented unless a separate correction and
+verification confirms that.
+
+\subsection{Step 2.3: Resampling to a Common Resolution}
+
+The original models differ substantially in their number of vertices. For example,
+the initial test set in Step 1 ranged from 233 vertices for the Bird to 54,223
+vertices for the Tree. Such differences can make later processing expensive and can
+cause comparisons to depend too strongly on mesh resolution.
+
+To reduce this variation, the target range was set to 5,000--10,000 vertices per
+shape. The adaptive resampling run selected an action for each model: meshes that
+already met the target were kept, while meshes that were outside the target were
+refined or decimated as required. A uniform resampling run was also carried out on
+the reduced subset as a comparison. The full database was then processed using the
+same target range.
+
+\begin{table}[htbp]
+\centering
+\small
+\begin{tabular}{@{}lrrrr@{}}
+\toprule
+Dataset / run & Shapes & Mean vertices & Std.\ dev. & In target range \\
+\midrule
+Reduced, adaptive & 217 & 7,528 & 764 & 100\% \\
+Reduced, uniform comparison & 217 & 7,502 & 596 & 100\% \\
+Full database, adaptive & 2,483 & 7,506 & 779 & 100\% \\
+\bottomrule
+\end{tabular}
+\caption{Vertex counts after the resampling runs. Values are rounded to whole vertices.}
+\label{tab:step2resampling}
+\end{table}
+
+For the full database, the mean output count was 7,506.21 vertices, with a standard
+deviation of 779.18. The smallest output mesh had 5,010 vertices and the largest had
+9,961 vertices. Thus, all 2,483 processed meshes were within the requested range.
+The processing actions were recorded as 1,754 refined meshes, 367 kept meshes, and
+362 decimated meshes. All 2,483 entries had a processing status of \texttt{ok}.
+
+The resulting meshes were written to \texttt{processed/step2\_full/}. The CSV log
+\texttt{resample\_log\_full.csv} stores the per-shape results, making it possible to
+trace the output count and processing action for an individual model.
+
+\subsection{Step 2.4: Checking the Refined Meshes}
+
+The resampling output was checked using the processing log and summary statistics.
+The check compared the number of entries in the log with the number of output OBJ
+files, inspected the recorded processing actions and statuses, and summarized the
+vertex and face counts. The output directory contained 2,483 OBJ files, matching the
+2,483 rows in the full-database log.
+
+\begin{table}[htbp]
+\centering
+\small
+\begin{tabular}{@{}lrr@{}}
+\toprule
+Measure & Minimum & Maximum \\
+\midrule
+Original vertices & 16 & 98,256 \\
+Vertices after cleaning & 16 & 73,440 \\
+Vertices after resampling & 5,010 & 9,961 \\
+Faces after resampling & 2,842 & 20,270 \\
+\bottomrule
+\end{tabular}
+\caption{Minimum and maximum mesh sizes recorded in the full-database log.}
+\label{tab:step2ranges}
+\end{table}
+
+The final vertex counts met the target range for all shapes, and no processing errors
+were reported. The face-count summary had a mean of 14,429.15 faces and a standard
+deviation of 2,102.27. These figures provide a compact check that the output meshes
+were generated and that their complexity is more consistent than in the original
+database.
+
+The numerical check is complemented by visual inspection. Shaded views help reveal
+the overall surface and whether the model still resembles the original shape, while
+wireframe views make the triangle distribution and local mesh density easier to
+inspect. The figure templates below use the same two-view layout as Step 1. Replace
+the suggested image filenames with images exported from the actual viewer. Do not
+claim that a model was visually inspected unless you have opened and checked it.
+
+% Optional image helper: displays the figure if the image exists, otherwise a labelled placeholder.
+\newcommand{\stepTwoImageOrPlaceholder}[2]{%
+  \IfFileExists{#1}{\includegraphics[width=\linewidth]{#1}}{%
+    \fbox{\parbox[c][3.3cm][c]{0.92\linewidth}{\centering
+    Image to be added\\[3pt]\texttt{\detokenize{#1}}}}}%
+  \caption{#2}%
+}
+
+\begin{figure}[htbp]
+\centering
+\begin{subfigure}{0.48\linewidth}
+  \centering
+  \stepTwoImageOrPlaceholder{figures/step2/Bird_raw_shaded.png}{Original mesh}
+\end{subfigure}\hfill
+\begin{subfigure}{0.48\linewidth}
+  \centering
+  \stepTwoImageOrPlaceholder{figures/step2/Bird_raw_wireframe.png}{Original mesh with wireframe}
+\end{subfigure}
+\caption{Bird model before resampling. Use the same viewing angle in both images so that the surface and triangle layout can be compared.}
+\label{fig:step2birdraw}
+\end{figure}
+
+\begin{figure}[htbp]
+\centering
+\begin{subfigure}{0.48\linewidth}
+  \centering
+  \stepTwoImageOrPlaceholder{figures/step2/Bird_refined_shaded.png}{Refined mesh}
+\end{subfigure}\hfill
+\begin{subfigure}{0.48\linewidth}
+  \centering
+  \stepTwoImageOrPlaceholder{figures/step2/Bird_refined_wireframe.png}{Refined mesh with wireframe}
+\end{subfigure}
+\caption{Bird model after resampling. Compare the overall shape with Figure~\ref{fig:step2birdraw}; the wireframe view shows the distribution of triangles in the refined mesh.}
+\label{fig:step2birdrefined}
+\end{figure}
+
+\subsection{Step 2.5: Translation and Scale Normalization}
+
+After resampling, the meshes were normalized so that their position and scale would
+not dominate later shape comparisons. First, the mean of all vertex positions was
+calculated and subtracted from each vertex. This places the vertex barycenter at the
+origin. Second, the largest dimension of the axis-aligned bounding box was scaled to
+one. The operation uses a single scale factor for all three coordinate axes, so it
+preserves the proportions of the model.
+
+For a mesh with vertices \(v_i\), the vertex barycenter is
+
+\begin{equation}
+\bar{v}=\frac{1}{N_V}\sum_{i=1}^{N_V}v_i.
+\label{eq:step2barycenter}
+\end{equation}
+
+The translated vertices are \(v_i'=v_i-\bar{v}\). Let the bounding-box extents of
+the translated mesh be
+
+\begin{equation}
+\Delta_x=x_{\max}-x_{\min},\qquad
+\Delta_y=y_{\max}-y_{\min},\qquad
+\Delta_z=z_{\max}-z_{\min}.
+\label{eq:step2extents}
+\end{equation}
+
+The largest extent is \(L=\max(\Delta_x,\Delta_y,\Delta_z)\). The normalized vertices
+are obtained with the uniform scale factor \(s=1/L\):
+
+\begin{equation}
+\hat{v}_i=\frac{v_i-\bar{v}}{L}.
+\label{eq:step2normalization}
+\end{equation}
+
+After this transformation, the barycenter is at the origin (up to floating-point
+precision), and the largest bounding-box dimension is one. The other two dimensions
+are at most one. Translation and uniform scaling do not change the mesh connectivity,
+so the face definitions remain unchanged.
+
+The normalized meshes were saved to \texttt{processed/step2\_normalized/}. A
+verification pass re-read the output meshes and checked the centre error, the largest
+bounding-box dimension, and whether the face count was preserved.
+
+\begin{table}[htbp]
+\centering
+\small
+\begin{tabular}{@{}lr@{}}
+\toprule
+Normalization check & Result \\
+\midrule
+Input meshes & 2,483 \\
+Normalized OBJ files & 2,483 \\
+Shapes verified & 2,483 \\
+Shapes passing all checks & 2,483 \\
+Shapes failing & 0 \\
+Mean centre error & \(2.03\times10^{-14}\) \\
+Maximum centre error & \(4.09\times10^{-13}\) \\
+Minimum largest dimension & 0.9999999999997 \\
+Maximum largest dimension & 1.0000000000002 \\
+Face counts preserved & Yes, for all shapes \\
+Normalization errors & 0 \\
+Verification errors & 0 \\
+\bottomrule
+\end{tabular}
+\caption{Verification results for the normalized database. Small centre and scale differences are due to floating-point precision.}
+\label{tab:step2normalization}
+\end{table}
+
+\begin{figure}[htbp]
+\centering
+\begin{subfigure}{0.48\linewidth}
+  \centering
+  \stepTwoImageOrPlaceholder{figures/step2/Bird_normalized_shaded.png}{Normalized mesh}
+\end{subfigure}\hfill
+\begin{subfigure}{0.48\linewidth}
+  \centering
+  \stepTwoImageOrPlaceholder{figures/step2/Bird_normalized_wireframe.png}{Normalized mesh with wireframe}
+\end{subfigure}
+\caption{Bird model after normalization. The model is centred at its vertex barycenter and its largest bounding-box dimension is one.}
+\label{fig:step2birdnormalized}
+\end{figure}
+
+\subsection{Discussion}
+
+The preprocessing results show that the pipeline was applied to the entire database,
+not only to the examples used for testing. The original files were scanned, the
+resampling log was generated, and the number of refined output files matched the
+number of input shapes. Every resampled mesh fell within the target vertex range of
+5,000--10,000. This reduces large differences in mesh resolution while retaining
+the shape as a triangle mesh.
+
+Normalization addresses a different issue. Resampling controls the number of
+vertices, whereas normalization controls position and scale. Moving each barycenter
+to the origin makes the coordinate systems more comparable, and scaling the largest
+bounding-box dimension to one gives every shape a common overall scale. The
+verification results support that both conditions were met to numerical precision,
+and the face counts were preserved.
+
+There are also limits to what these checks establish. A mesh can meet the vertex
+target and normalization conditions while still having local geometric defects.
+Likewise, a successful processing status does not by itself prove that every surface
+is visually perfect or consistently oriented. Visual inspection of representative
+original, refined, and normalized models is therefore useful alongside the numerical
+checks. The orientation diagnostic should also be reported separately from the
+resampling status.
+
+\subsection{Conclusion}
+
+Step 2 prepared all 2,483 shapes for the later stages of the retrieval system. The
+full-database resampling run completed with no reported processing failures, and
+every output mesh contained between 5,010 and 9,961 vertices. The output database
+therefore satisfies the selected 5,000--10,000 vertex target.
+
+The normalization step also completed for all 2,483 meshes. The mean centre error
+was approximately \(2.03\times10^{-14}\), the largest bounding-box dimension was
+one within floating-point precision, and all face counts were preserved. The refined
+meshes are available in \texttt{processed/step2\_full/}, and the normalized meshes
+are available in \texttt{processed/step2\_normalized/}. These outputs provide a
+consistent starting point for the next stages of the multimedia retrieval assignment.
+
 \clearpage
 \section*{References}
 \addcontentsline{toc}{section}{References}
