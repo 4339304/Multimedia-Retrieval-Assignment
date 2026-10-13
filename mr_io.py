@@ -1,4 +1,4 @@
-"""Shared I/O + rendering helpers (Step 2 onward).
+"""Shared I/O + rendering helpers
 
 load_mesh / the Plotly viewer are copied from the Step 1 notebook so Step 1 stays untouched.
 read_obj_raw parses the OBJ text directly so the *original* face sizes (tri/quad/n-gon) are kept,
@@ -9,7 +9,10 @@ from pathlib import Path
 import numpy as np
 import trimesh
 
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
+# The project folder holds Data/, processed/ and report/. The code is normally in its src/ folder;
+# if the .py files lie directly in the project folder, that folder is used instead.
+_HERE = Path(__file__).resolve().parent
+PROJECT_ROOT = _HERE.parent if _HERE.name == "src" else _HERE
 DATA_DIR = PROJECT_ROOT / "Data"
 
 
@@ -68,12 +71,13 @@ def triangulate(sizes, idx):
     return np.stack([idx[s], idx[s + i], idx[s + i + 1]], axis=1)
 
 
-def write_obj(path, V, F):
-    """Write a triangle mesh as a plain OBJ (v / f lines only)."""
+def write_obj(path, V, F, digits=7):
+    """Write a triangle mesh as a plain OBJ (v / f lines only), coordinates with `digits`
+    significant digits."""
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "w") as fh:
-        np.savetxt(fh, np.asarray(V), fmt="v %.7g %.7g %.7g")
+        np.savetxt(fh, np.asarray(V), fmt=f"v %.{digits}g %.{digits}g %.{digits}g")
         np.savetxt(fh, np.asarray(F, dtype=np.int64) + 1, fmt="f %d %d %d")
 
 
