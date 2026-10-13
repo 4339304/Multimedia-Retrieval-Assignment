@@ -1,9 +1,12 @@
-﻿from pathlib import Path
+from pathlib import Path
 
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-from mr_io import PROJECT_ROOT
+from mr_io import PROJECT_ROOT, mesh_arrays, render_png
 
 PROCESSED = PROJECT_ROOT / "processed"
 DATA_OUT = PROJECT_ROOT / "report" / "data" / "step2"
@@ -207,3 +210,19 @@ print(f"Normalization errors: {len(errors)}")
 print(f"Verification errors: {len(verification_errors)}")
 print(f"\nNormalized meshes saved in: {NORMALIZED_DIR}")
 print(f"Statistics saved in: {DATA_OUT}")
+
+
+# Viewer check: the Bird of Step 2.4 after normalization (same names as in the report).
+def crop_white(png, pad=12):
+    img = plt.imread(png)
+    ys, xs = (img[..., :3].min(axis=2) < 0.97).nonzero()
+    plt.imsave(png, img[max(ys.min() - pad, 0):ys.max() + pad, max(xs.min() - pad, 0):xs.max() + pad])
+
+
+bird = NORMALIZED_DIR / "Bird" / "D00089.obj"
+V, F = mesh_arrays(bird)
+for kind, wire in (("shaded", False), ("wireframe", True)):
+    png = FIG / "step2" / f"Bird_normalized_{kind}.png"
+    render_png(V, F, png, wireframe=wire, title=None)
+    crop_white(png)
+print(f"Viewer images of the normalized Bird saved in: {FIG / 'step2'}")
