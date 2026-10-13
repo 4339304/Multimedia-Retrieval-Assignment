@@ -1,7 +1,7 @@
-Multimedia Retrieval assignment - code for Step 1 and Step 2
-==============================================================
+Multimedia Retrieval assignment - code for Steps 1 to 3.1
+==========================================================
 
-1. Put the shape database in the folder Data/ next to src/
+1. Put the shape database in the folder Data/ next to the .py files
    (one sub-folder per class, e.g. Data/Bicycle/D00016.obj).
    Download: https://github.com/MaxRee94/ShapeDatabase_INFOMR
 
@@ -9,18 +9,23 @@ Multimedia Retrieval assignment - code for Step 1 and Step 2
        pip install -r requirements.txt
 
 3. Step 1 - view a shape:
-       python src/view_mesh.py Data/Bird/D00089.obj --wireframe
+       python view_mesh.py Data/Bird/D00089.obj --wireframe
    (left-drag: rotate, scroll: zoom, ctrl+left-drag: pan, w: wireframe)
-   The Plotly viewer and the database-wide load test are in
-   report/step1_read_and_view.ipynb (outputs were cleared to keep the file small;
-   run the notebook to recreate them).
+   The Plotly viewer and the database-wide load test are in step1_read_and_view.ipynb.
 
-4. Step 2 - analysis and resampling of the whole database:
-       python src/run_step2.py --force               (about 7-8 minutes on 8 cores)
-       python src/run_step2.py --force --skip-full   (only the reduced database, about 2 minutes)
-   Results:
-       report/data/step2/      csv files with the statistics
-       processed/step2_full/   resampled database (input for Step 3)
-   Figures and statistics for the report: report/step2_preprocessing.ipynb
+4. Step 2 - analysis, resampling, checking and normalization (run in this order):
+       python run_step2.py --force        2.1-2.3: statistics and resampling (about 8 minutes)
+       python check_resampling.py         2.4: check of the resampled database (about 3 minutes)
+       python normalize_shapes.py         2.5: centering and scaling (about 8 minutes)
+   Figures and statistics for the report: step2_preprocessing.ipynb
 
-Keep this folder structure: the code finds Data/ relative to src/.
+5. Step 3.1 - full normalization (alignment and flipping), needs the output of 2.5:
+       python run_step3_1.py --force      (about 6 minutes)
+       python figures_step3_1.py          figures for the report
+
+Results:
+   processed/step2_full/          resampled shapes (Step 2.3)
+   processed/step2_normalized/    centered and scaled shapes (Step 2.5)
+   processed/step3_normalized/    fully normalized shapes (Step 3.1, input for Step 3.2)
+   report/data/                   statistics (csv)
+   report/figures/                figures (copied to Images/ for the report)
