@@ -574,7 +574,7 @@ started again from the cleaned mesh, at most eight times. The result in the acce
 is kept.
 
 \paragraph{Decimation.} Shapes with more than 10,000 vertices are simplified with quadric error metric decimation~[13] from
-Open3D~[9]. Every vertex gets a matrix $Q_v=\sum_p \mathbf p\mathbf p^{\mathsf T}$, summed over the planes
+Open3D~[9]. The same is done for the few refined shapes that end above 10,000 vertices. Every vertex gets a matrix $Q_v=\sum_p \mathbf p\mathbf p^{\mathsf T}$, summed over the planes
 $\mathbf p=(a,b,c,d)$ of its neighboring triangles. The method repeatedly merges the two end points of the edge with the lowest
 cost
 \begin{equation}
@@ -594,7 +594,8 @@ where $S_1$ and $S_2$ are the original and the decimated surface, $P_1$ and $P_2
 the bounding-box diagonal. Because only sample points are used, $\delta_H$ is an estimate of the exact Hausdorff distance. A result is accepted if it is in the range of 5,000 to 10,000 vertices and $\delta_H\le 5\,\%$.
 Otherwise two other methods are tried: quadric decimation with a higher weight on the boundary edges, and vertex clustering~[14],
 which puts a grid with cell size $s$ over the shape and replaces all vertices in one grid cell by their average. The cell size
-$s$ is found by bisection so that the vertex count is close to $V_{\text{target}}$. The best of the accepted results is kept.
+$s$ is found by bisection so that the vertex count is close to $V_{\text{target}}$. The methods are tried in this order, and the
+first accepted result is used. If none of them is accepted, the result inside the range with the smallest $\delta_H$ is kept.
 
 \paragraph{Reduced database.} As suggested in the assignment, the method was first developed on a reduced, balanced database
 before it was run on all shapes. This database contains three random shapes of every class (207 shapes), plus the five smallest
@@ -606,8 +607,8 @@ edge-splitting refinement made them more even (median CV 0.88), so the edge-spli
 
 \paragraph{Results.} All 2,483 shapes were processed without errors, in about 6.5 minutes on 8 processor cores. 1,754 shapes
 were refined, 362 decimated and 367 kept. All shapes now have between 5,010 and 9,961 vertices, with a mean of 7,506
-(Table~\ref{tab:s23results}). No shape had to be removed, so the classes still contain 15 to 143 shapes. The refinement does not
-move the surface at all (largest $\delta_H = 0.09\,\%$) and makes the triangle sizes more even. The decimation moves the surface
+(Table~\ref{tab:s23results}). No shape had to be removed, so the classes still contain 15 to 143 shapes. The refinement hardly
+moves the surface (largest $\delta_H = 0.09\,\%$) and makes the triangle sizes more even. The decimation moves the surface
 only a little: $\delta_H$ is below 2.3\,\% for 95\,\% of the decimated shapes and at most 4.7\,\%.
 
 \begin{table}[htbp]\centering\small
@@ -688,7 +689,7 @@ coefficient of variation of the triangle areas,
   \label{eq:cv}
 \end{equation}
 was computed for every shape, where $\mu_A$ and $\sigma_A$ are the mean and the standard deviation of the triangle areas $A_t$.
-The median CV went down from 2.46 to 1.07, so the triangle sizes are clearly more even after the resampling
+The median CV went down from 2.46 to 1.06, so the triangle sizes are clearly more even after the resampling
 (Figure~\ref{fig:s24hist}c). The decimated shapes improve less than the refined ones, because quadric decimation keeps the shape
 and not the triangle size.
 
@@ -862,10 +863,13 @@ The four steps are separate functions (\texttt{center}, \texttt{align}, \texttt{
 about four minutes on eight cores and saves them as the input for the feature extraction.
 
 \paragraph{Test on a known shape.}
-Before running the whole database, the pipeline was tested on a box of $4\times2\times1$ with one enlarged end, so that its mass is
-not symmetric. The box was rotated, mirrored, moved and enlarged in six random ways. All six results were identical to the
-normalized original box (largest difference $3\cdot10^{-16}$), had the expected size $1\times0.8\times0.4$, had the heavy end on the
-positive $x$ axis and still had outward normals.
+Before running the whole database, the pipeline was tested on a box of $4\times2\times1$. Its positive half was stretched along each
+axis (by 1.5 along $x$, 1.3 along $y$ and 1.2 along $z$), so that the box is not symmetric in any direction and the moment test has
+a clear answer. The box was rotated, mirrored, moved and scaled in six random ways. All six results were identical to the
+normalized original box (largest difference $8\cdot10^{-16}$), had the expected size $1\times0.46\times0.22$, had the longer half on
+the positive side of every axis and still had outward normals. With a box that is symmetric along an axis, the moment along that axis
+is zero, and the direction of that axis is then decided by rounding errors; this is the same effect as for the symmetric shapes
+described below.
 
 \paragraph{Verification on the whole database.}
 For each step, the value that the step should fix was measured on all 2,483 shapes (Table~\ref{tab:normcheck},
@@ -894,7 +898,8 @@ for $e_1$, 2,341 shapes for $e_2$; see the text on shapes with unclear axes).}
 \caption{Histograms of the four normalization measures over all 2,483 shapes, before (outline) and after (filled) the
 normalization: (a) distance of the barycenter to the origin, (b) angle between the major eigenvector and the $x$ axis,
 (c) number of axes that fail the moment test, (d) largest side of the bounding box. Axes (a) and (d) are logarithmic,
-because the original shapes range over 17 orders of magnitude in position and size.}
+because the values cover many orders of magnitude (the barycenter distance goes from up to $1.9\cdot10^{8}$ before to about
+$10^{-13}$ after the normalization).}
 \label{fig:normhist}
 \end{figure}
 
@@ -928,7 +933,9 @@ Figure~\ref{fig:normexamples} shows four shapes before and after the normalizati
 $z$ (blue) axes drawn at the origin. After the normalization, the direction in which the vertices are spread out most lies along
 $x$ and the second one along $y$. For most shapes this is also the longest side of the bounding box (2,276 of the 2,483 shapes),
 but not for all, because PCA uses the spread of all vertices and not only the outer extent of the shape. The sword was stored along the $z$ axis and the humanoid upright along $y$; both now lie along $x$. The bicycle
-was already aligned, but it was mirrored by the moment test. The chess piece is one of the rotationally symmetric shapes.
+was already lying along $x$, but PCA returned its main axis pointing in the $-x$ direction (the sign of an eigenvector is
+arbitrary), so the alignment turned it around by $180^\circ$. The moment test then found most of its mass on the positive side of
+every axis, so no flip was needed. The chess piece is one of the rotationally symmetric shapes.
 
 \newcommand{\normpair}[3]{%
 \begin{subfigure}{0.245\linewidth}\centering\includegraphics[width=\linewidth]{#1_before.png}\caption{#2, before}\end{subfigure}\hfill
