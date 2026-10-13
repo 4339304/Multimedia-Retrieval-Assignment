@@ -1,6 +1,6 @@
 % =============================================================================================
 % Multimedia Retrieval assignment: technical report.
-% Images used by the report: the folders Images/ and figures/step1_smooth/ next to this file.
+% All images used by the report are in the folder Images/ next to this file.
 % =============================================================================================
 \documentclass[10pt,a4paper]{article}
 
@@ -50,8 +50,8 @@
 \counterwithin{figure}{section}
 \counterwithin{equation}{section}
 
-% figures are found in these folders
-\graphicspath{{Images/}{figures/step1_smooth/}}
+% all figures are in this folder
+\graphicspath{{Images/}}
 
 % shortcuts used in the text
 \newcommand{\R}{\mathbb{R}}
@@ -113,13 +113,16 @@
   \item \textbf{Text:} the text was revised to be more concise.
   \item \textbf{Face type:} the face type is now measured: all 2,483 shapes consist of triangles only
         (Section~\ref{sec:loading}). Table~\ref{tab:six} now also lists the file and the face type of each shape.
-  \item \textbf{Shading of the Hand shape:} the coloured patches in the former Figure~4 were investigated. The patches are an
+  \item \textbf{Shading of the Hand shape:} the colored patches in the former Figure~4 were investigated. The patches are an
         artifact of flat shading. All shapes are now rendered with smooth shading (Section~\ref{sec:results1},
         Figure~\ref{fig:handshading}).
   \item \textbf{Figures:} each figure shows the shaded and wireframe views as subfigures (a) and (b) in the same order. The
         captions name the file of the shape and describe what is shown.
 \end{itemize}
-\textbf{Step 2:} the first version was added.
+\textbf{Step 2:} the first version was added (Section~\ref{sec:step2}).
+
+\textbf{Step 3:} the full normalization of Step 3.1 was added (Section~\ref{sec:normalization}). The feature extraction of
+Step 3.2 will follow later.
 \clearpage
 
 {\small\tableofcontents}
@@ -134,8 +137,9 @@ similar to it. The database contains 2,483 shapes in 69 classes, stored as Wavef
 
 \subsection{Structure of the Report}
 Section~\ref{sec:step1} describes how the shapes are read from disk and visualized, and Section~\ref{sec:step2} describes
-the analysis and preprocessing of the shape database. The rest of this section introduces the mathematical notation
-(Section~\ref{sec:notation}) and the software that was used (Section~\ref{sec:tools}).
+the analysis and preprocessing of the shape database. Section~\ref{sec:step3} covers the feature extraction; at the moment it
+contains the full normalization of the shapes, which is the first part of this step. Section~\ref{sec:intro} also introduces the
+mathematical notation (Section~\ref{sec:notation}) and the software that was used (Section~\ref{sec:tools}).
 
 \subsection{Mathematical Notation}\label{sec:notation}
 
@@ -153,7 +157,7 @@ is the set of vertices and
 is the set of faces. A face is a tuple of $k_j=\card{f_j}\ge 3$ vertex indices. A face with $k_j=3$ is a triangle,
 $f_j=(v_j^1,v_j^2,v_j^3)$, and a face with $k_j=4$ is a quad. The face type of a mesh is
 $\tau(M)=\textit{triangles}$ if $k_j=3$ for all $j$, $\tau(M)=\textit{quads}$ if $k_j=4$ for all $j$, and
-$\tau(M)=\textit{mixed}$ otherwise. The face type is not assumed but measured for every shape (Section~\ref{sec:step2}).
+$\tau(M)=\textit{mixed}$ otherwise. The face type is not assumed but measured for every shape (Section~\ref{sec:s21}).
 The database also provides a class label $c(M)\in\mathcal{C}$, $\card{\mathcal{C}}=69$, for each shape through its folder
 structure. For example, shapes stored in the Bicycle, Bird, or House folders belong to those respective classes. The class labels are
 used later to evaluate the retrieval results.
@@ -196,8 +200,17 @@ $\tau(M)$, $c(M)$, $\mathcal{C}$ & face type, class label, set of classes & \ref
 $B(M)$, $d(M)$ & axis-aligned bounding box and its diagonal & \ref{sec:notation}\\
 $n_j$ & unit normal of triangle $f_j$ & \ref{sec:notation}\\
 $\mathrm{Vol}(M)$ & signed volume & \ref{sec:notation}\\
-$\bar v$ & barycenter of the shape & ?\\
-$\lambda_1\ge\lambda_2\ge\lambda_3$, $e_1,e_2,e_3$ & eigenvalues and eigenvectors of the vertex covariance matrix & ?\\
+$V_{\text{target}}$, $[N_{lo},N_{hi}]$ & target vertex count and accepted range of the resampling & \ref{sec:resampling}\\
+$L$ & maximum edge length of the refinement & \ref{sec:resampling}\\
+$A_t$, $\mathrm{CV}(M)$ & area of triangle $t$, coefficient of variation of the triangle areas & \ref{sec:resampling}\\
+$Q_v$, $s$ & quadric matrix of a vertex (decimation), cell size of the vertex clustering & \ref{sec:resampling}\\
+$\delta_H$ & Hausdorff distance between the original and the resampled surface & \ref{sec:resampling}\\
+$\bar v$ & barycenter of the shape (mean of the vertices) & \ref{sec:s25}\\
+$\Sigma$ & covariance matrix of the vertices & \ref{sec:normalization}\\
+$\lambda_1\ge\lambda_2\ge\lambda_3$, $e_1,e_2,e_3$ & eigenvalues and unit eigenvectors of $\Sigma$ & \ref{sec:normalization}\\
+$C_t$ & center of triangle $t$ & \ref{sec:normalization}\\
+$f_k$, $s_k$ & moment and flip sign along axis $k\in\{x,y,z\}$ & \ref{sec:normalization}\\
+$D_{\max}$ & largest side of the axis-aligned bounding box & \ref{sec:normalization}\\
 \bottomrule\end{tabular}
 \caption{Notation used in this report.}\label{tab:notation}
 \end{table}
@@ -260,7 +273,7 @@ In addition, a standalone viewer based on Open3D~[9] was written for fast explor
 rendered views as images.
 
 The surface is displayed with Plotly's \texttt{Mesh3d}. Shading makes the three-dimensional structure easier to see. Smooth
-shading is used, in which the colour is interpolated from normals averaged at the vertices, because flat shading of dense meshes
+shading is used, in which the color is interpolated from normals averaged at the vertices, because flat shading of dense meshes
 produces visual artifacts (Section~\ref{sec:results1}). The optional wireframe is drawn from the edges of the faces.
 
 The viewer supports the following interaction:
@@ -280,7 +293,7 @@ removed without notice, which would distort the statistics of Section~\ref{sec:s
 shape in this report.
 
 Because triangulation during loading would hide the original face type $\tau(M)$, the face type is determined separately, by
-reading the \texttt{f} lines of the OBJ files directly (Section~\ref{sec:step2}). All 2,483 shapes consist of triangles only,
+reading the \texttt{f} lines of the OBJ files directly (Section~\ref{sec:s21}). All 2,483 shapes consist of triangles only,
 so the triangulation never changes a mesh.
 
 \subsection{Results}\label{sec:results1}
@@ -312,9 +325,9 @@ rotated, zoomed and panned without problems.
 
 The loader was also run on the whole database. All 2,483 OBJ files in 69 classes were loaded without exceptions, and none of
 the meshes was empty. This only shows that the files can be parsed, not that the meshes are free of geometric problems; these
-are analysed in Section~\ref{sec:step2}.
+are analyzed in Section~\ref{sec:step2}.
 
-% \reportfig{shape}{label}{caption}   (images are in the folder figures/step1_smooth/)
+% \reportfig{shape}{label}{caption}
 \newcommand{\reportfig}[3]{%
 \begin{figure}[htbp]\centering
 \begin{subfigure}{0.48\linewidth}\centering\includegraphics[width=\linewidth]{#1_shaded.png}\caption{shaded}\end{subfigure}\hfill
@@ -329,7 +342,7 @@ are analysed in Section~\ref{sec:step2}.
 \reportfig{Tree}{fig:tree}{Tree (D00096), the largest of the six test shapes (54,223 vertices), with a strongly branching structure: (a) smooth shading, (b) with the wireframe drawn on top.}
 
 \paragraph{Shading of the Hand Shape.}
-With flat shading, in which every triangle receives one colour computed from its normal $n_j$, the Hand shows irregular dark
+With flat shading, in which every triangle receives one color computed from its normal $n_j$, the Hand shows irregular dark
 patches (Figure~\ref{fig:handshading}a). Such patches are typical for inconsistently oriented faces, whose normals point to the
 inside of the surface, so the orientation of the Hand mesh was checked. The mesh is consistently oriented: none of its 23,782 edges is
 traversed in the same direction by its two faces, and its signed volume (Eq.~\eqref{eq:signedvolume}) is positive, which means that the normals point
@@ -339,8 +352,8 @@ in the renderer for dense meshes with many small triangles. With smooth shading 
 (Figure~\ref{fig:handshading}c), and smooth shading is therefore used for all figures in this report.
 
 Inconsistent orientation does occur elsewhere in the database: 693 of the 2,483 shapes (28\,\%), including the Bicycle and
-the House of Table~\ref{tab:six}, contain inconsistently oriented faces. These will be reoriented during preprocessing
-(Section~\ref{sec:step2}).
+the House of Table~\ref{tab:six}, contain inconsistently oriented faces. These are reoriented during the preprocessing
+(Section~\ref{sec:resampling}).
 
 \begin{figure}[htbp]\centering
 \begin{subfigure}{0.32\linewidth}\centering\includegraphics[width=\linewidth]{hand_flat_crop.png}\caption{flat shading}\end{subfigure}\hfill
@@ -372,336 +385,570 @@ The viewer was tested on six shapes from different classes, from small meshes su
 larger meshes such as the House and the Tree, and the loader reads all 2,483 shapes of the database without errors. The
 application is used to inspect the shapes during the preprocessing described in Section~\ref{sec:step2}.
 
+% =============================================================================================
 \section{Step 2: Preprocessing and Cleaning}\label{sec:step2}
+% =============================================================================================
 
 \subsection{Aim and Overview}
+The shapes in the database are sampled very differently, from 16 to 98,256 vertices, and many of them contain geometric
+problems such as duplicate vertices or inconsistently oriented faces. Both affect the features of Step~3: descriptors that use
+the vertices depend on how many there are and how they are spread over the surface, and descriptors based on areas, volumes or
+normals need a clean surface. The goal of Step~2 is therefore to analyze the database, to clean the meshes, to bring them to a
+similar resolution and finally to move and scale them to a common position and size.
 
-The purpose of Step 2 is to prepare the 3D shape database for the later retrieval
-stages. The original models have different resolutions and can contain geometric
-irregularities. Comparing them directly would therefore make later measurements less
-consistent. We first examined the database, then cleaned and resampled the meshes to
-obtain a more uniform representation. Finally, every processed shape was translated
-and scaled to a common coordinate system.
-
-The preprocessing was applied to the complete database of 2,483 OBJ files. The
-main output is a set of refined meshes with approximately 5,000--10,000 vertices
-per shape, followed by a normalized version of every mesh. Figure~\ref{fig:step2pipeline}
-summarizes the workflow.
+The whole database of 2,483 shapes was processed. Figure~\ref{fig:step2pipeline} shows the steps; each of them is described in
+one of the following subsections.
 
 \begin{figure}[htbp]
 \centering
 \begin{tikzpicture}[
-  node distance=0.55cm,
+  node distance=0.45cm,
   stage/.style={draw, rounded corners, align=center, text width=0.78\linewidth,
-                minimum height=0.7cm, inner sep=5pt},
+                minimum height=0.65cm, inner sep=4pt},
   arrow/.style={-{Stealth[length=2mm]}, thick}
 ]
-\node[stage] (input) {Original database\\2,483 Wavefront OBJ meshes};
-\node[stage, below=of input] (scan) {Step 2.1--2.2: scan files and collect mesh statistics};
-\node[stage, below=of scan] (clean) {Clean mesh data and check face orientation};
-\node[stage, below=of clean] (sample) {Step 2.3: resample meshes to 5,000--10,000 vertices};
-\node[stage, below=of sample] (check) {Step 2.4: check processing logs and inspect meshes};
-\node[stage, below=of check] (norm) {Step 2.5: centre at the origin and scale the largest extent to 1};
-\node[stage, below=of norm] (output) {Processed database\\2,483 refined and 2,483 normalized meshes};
+\node[stage] (input) {Original database: 2,483 OBJ meshes};
+\node[stage, below=of input] (scan) {Step 2.1--2.2: analyze every shape and collect statistics of the database};
+\node[stage, below=of scan] (clean) {Step 2.3: clean the meshes and fix the face orientation};
+\node[stage, below=of clean] (sample) {Step 2.3: resample every mesh to 5,000--10,000 vertices};
+\node[stage, below=of sample] (check) {Step 2.4: check the resampled meshes (statistics and viewer)};
+\node[stage, below=of check] (norm) {Step 2.5: move the barycenter to the origin and scale the largest side to 1};
 \draw[arrow] (input) -- (scan);
 \draw[arrow] (scan) -- (clean);
 \draw[arrow] (clean) -- (sample);
 \draw[arrow] (sample) -- (check);
 \draw[arrow] (check) -- (norm);
-\draw[arrow] (norm) -- (output);
 \end{tikzpicture}
-\caption{Overview of the preprocessing pipeline implemented for Step 2.}
+\caption{Preprocessing pipeline of Step 2.}
 \label{fig:step2pipeline}
 \end{figure}
 
-\subsection{Database Inspection and Initial Statistics}
+\subsection{Step 2.1: Analyzing a Single Shape}\label{sec:s21}
+For every shape, the analysis tool outputs its class, the number of vertices $N_V$ and faces $N_F$, the face type $\tau(M)$ and
+the axis-aligned bounding box $B(M)$ (Eq.~\eqref{eq:aabb}). The class is the name of the folder that contains the file. All other
+values are read from the OBJ file itself. The file is parsed directly instead of with a mesh library, because libraries such as
+trimesh triangulate polygons while loading, and then the original face type could not be measured (Section~\ref{sec:loading}).
+Table~\ref{tab:s21} shows the output for the six shapes of Step~1.
 
-The database contains 2,483 shapes organized into 69 class folders. The folder name
-provides the class label, while each model is stored as an OBJ file. As in Step 1,
-the vertex and face records were read from the files. The face type was checked from
-the original face definitions rather than inferred from a mesh that might already
-have been triangulated by a loading library.
-
-All 2,483 shapes were found to contain triangular faces. This is useful because the
-same basic face representation can be used throughout the preprocessing pipeline.
-However, a file being readable does not automatically mean that its mesh is clean:
-the number of vertices varies considerably, and some meshes can contain duplicate
-vertices, degenerate geometry, or inconsistent face orientation. These properties
-were therefore considered separately from successful file loading.
-
-\begin{table}[htbp]
-\centering
-\small
-\begin{tabular}{@{}lr@{}}
-\toprule
-Initial database check & Result \\
-\midrule
-Number of shapes scanned & 2,483 \\
-Number of classes & 69 \\
-Shapes with triangular faces & 2,483 (100\%) \\
-Shapes with a different face type & 0 \\
-OBJ files successfully scanned & 2,483 \\
-\bottomrule
-\end{tabular}
-\caption{Results of the initial scan of the shape database.}
-\label{tab:step2initial}
+\begin{table}[htbp]\centering\small
+\begin{tabular}{@{}llrrlrrrrrr@{}}\toprule
+Class & File & $N_V$ & $N_F$ & $\tau(M)$ & $x_{\min}$ & $y_{\min}$ & $z_{\min}$ & $x_{\max}$ & $y_{\max}$ & $z_{\max}$\\\midrule
+Bicycle & D00016 & 2,769  & 5,049  & triangles & $-0.914$ & $-0.441$ & $-0.210$ & 0.960 & 0.818 & 0.178\\
+Bird    & D00089 & 233    & 462    & triangles & $-1.164$ & $-0.563$ & $-0.315$ & 0.785 & 0.508 & 0.155\\
+Chess   & D01017 & 380    & 756    & triangles & $-0.193$ & $-0.139$ & $-0.141$ & 0.252 & 0.139 & 0.142\\
+Hand    & D01006 & 7,929  & 15,855 & triangles & 0.025    & 0.025    & 0.025    & 0.576 & 0.975 & 0.675\\
+House   & D00001 & 46,622 & 90,161 & triangles & $-0.726$ & $-0.989$ & $-0.542$ & 1.008 & 0.753 & 0.440\\
+Tree    & D00096 & 54,223 & 36,512 & triangles & $-0.671$ & $-0.373$ & $-0.334$ & 1.189 & 0.359 & 0.362\\
+\bottomrule\end{tabular}
+\caption{Output of the single-shape analysis for the six shapes of Step~1: class, file, number of vertices and faces, face type and
+axis-aligned bounding box.}\label{tab:s21}
 \end{table}
 
-\subsection{Mesh Cleaning and Orientation}
+Besides these values, the tool also measures properties that tell how clean a mesh is. Vertices with exactly the same
+coordinates are counted as duplicates. A triangle is called degenerate if two of its corners are the same vertex or if its area
+is practically zero ($\le 10^{-12}\,d(M)^2$). Every edge is counted with the number of faces that contain it: an edge in one face
+is a boundary edge, an edge in two faces is a normal (manifold) edge and an edge in three or more faces is non-manifold. A mesh is
+closed if it has no boundary and no non-manifold edges. Finally, two neighboring faces have an orientation conflict if they
+list their shared edge in the same direction (Section~\ref{sec:notation}).
 
-Before resampling, the mesh data was checked and cleaned where necessary. Cleaning
-is important because repeated vertices and degenerate faces can affect geometric
-measurements and make later processing less reliable. The preprocessing log records
-the original vertex count, the count after cleaning, the output count, and the
-action taken for each model.
+\subsection{Step 2.2: Statistics over the Whole Database}\label{sec:s22}
+The analysis tool was run on all 2,483 shapes and the results were saved in one table (CSV file) with one row per shape. All
+shapes are triangle meshes; none of them contains quads or mixed faces. Table~\ref{tab:s22stats} summarizes the vertex and face
+counts and Figure~\ref{fig:s22hist} shows their histograms. Because the counts cover four orders of magnitude, the histograms
+have a logarithmic horizontal axis.
 
-Face orientation was also considered. In a consistently oriented closed triangle
-mesh, neighbouring faces traverse a shared edge in opposite directions. When this
-condition is not satisfied, the surface normals may disagree locally. The initial
-inspection in Step 1 found orientation inconsistencies in part of the database, so
-orientation was treated as a separate quality check rather than assuming that all
-input meshes were already correct.
-
-The implementation's log reported successful processing for all 2,483 meshes in
-the full database. The orientation check passed for 2,420 of the 2,483 full-database
-meshes. This result should be interpreted as a diagnostic: successful resampling and
-a successful orientation check are different properties, and the remaining meshes
-should not be described as consistently oriented unless a separate correction and
-verification confirms that.
-
-\subsection{Step 2.3: Resampling to a Common Resolution}
-
-The original models differ substantially in their number of vertices. For example,
-the initial test set in Step 1 ranged from 233 vertices for the Bird to 54,223
-vertices for the Tree. Such differences can make later processing expensive and can
-cause comparisons to depend too strongly on mesh resolution.
-
-To reduce this variation, the target range was set to 5,000--10,000 vertices per
-shape. The adaptive resampling run selected an action for each model: meshes that
-already met the target were kept, while meshes that were outside the target were
-refined or decimated as required. A uniform resampling run was also carried out on
-the reduced subset as a comparison. The full database was then processed using the
-same target range.
-
-\begin{table}[htbp]
-\centering
-\small
-\begin{tabular}{@{}lrrrr@{}}
-\toprule
-Dataset / run & Shapes & Mean vertices & Std.\ dev. & In target range \\
-\midrule
-Reduced, adaptive & 217 & 7,528 & 764 & 100\% \\
-Reduced, uniform comparison & 217 & 7,502 & 596 & 100\% \\
-Full database, adaptive & 2,483 & 7,506 & 779 & 100\% \\
-\bottomrule
-\end{tabular}
-\caption{Vertex counts after the resampling runs. Values are rounded to whole vertices.}
-\label{tab:step2resampling}
+\begin{table}[htbp]\centering\small
+\begin{tabular}{@{}lrrrrrrr@{}}\toprule
+ & mean & std.\ dev. & min & 25\,\% & median & 75\,\% & max\\\midrule
+$N_V$ & 5,610  & 9,851  & 16 & 490 & 1,826 & 6,306  & 98,256\\
+$N_F$ & 10,692 & 16,191 & 16 & 924 & 3,615 & 13,364 & 129,881\\
+\bottomrule\end{tabular}
+\caption{Statistics of the number of vertices $N_V$ and faces $N_F$ over all 2,483 shapes.}\label{tab:s22stats}
 \end{table}
 
-For the full database, the mean output count was 7,506.21 vertices, with a standard
-deviation of 779.18. The smallest output mesh had 5,010 vertices and the largest had
-9,961 vertices. Thus, all 2,483 processed meshes were within the requested range.
-The processing actions were recorded as 1,754 refined meshes, 367 kept meshes, and
-362 decimated meshes. All 2,483 entries had a processing status of \texttt{ok}.
-
-The resulting meshes were written to \texttt{processed/step2\_full/}. The CSV log
-\texttt{resample\_log\_full.csv} stores the per-shape results, making it possible to
-trace the output count and processing action for an individual model.
-
-\subsection{Step 2.4: Checking the Refined Meshes}
-
-The resampling output was checked using the processing log and summary statistics.
-The check compared the number of entries in the log with the number of output OBJ
-files, inspected the recorded processing actions and statuses, and summarized the
-vertex and face counts. The output directory contained 2,483 OBJ files, matching the
-2,483 rows in the full-database log.
-
-\begin{table}[htbp]
-\centering
-\small
-\begin{tabular}{@{}lrr@{}}
-\toprule
-Measure & Minimum & Maximum \\
-\midrule
-Original vertices & 16 & 98,256 \\
-Vertices after cleaning & 16 & 73,440 \\
-Vertices after resampling & 5,010 & 9,961 \\
-Faces after resampling & 2,842 & 20,270 \\
-\bottomrule
-\end{tabular}
-\caption{Minimum and maximum mesh sizes recorded in the full-database log.}
-\label{tab:step2ranges}
-\end{table}
-
-The final vertex counts met the target range for all shapes, and no processing errors
-were reported. The face-count summary had a mean of 14,429.15 faces and a standard
-deviation of 2,102.27. These figures provide a compact check that the output meshes
-were generated and that their complexity is more consistent than in the original
-database.
-
-The numerical check is complemented by visual inspection. Shaded views help reveal
-the overall surface and whether the model still resembles the original shape, while
-wireframe views make the triangle distribution and local mesh density easier to
-inspect. The figure templates below use the same two-view layout as Step 1. Replace
-the suggested image filenames with images exported from the actual viewer. Do not
-claim that a model was visually inspected unless you have opened and checked it.
-
-% Optional image helper: displays the figure if the image exists, otherwise a labelled placeholder.
-\newcommand{\stepTwoImageOrPlaceholder}[2]{%
-  \IfFileExists{#1}{\includegraphics[width=\linewidth]{#1}}{%
-    \fbox{\parbox[c][3.3cm][c]{0.92\linewidth}{\centering
-    Image to be added\\[3pt]\texttt{\detokenize{#1}}}}}%
-  \caption{#2}%
-}
-
-\begin{figure}[htbp]
-\centering
-\begin{subfigure}{0.48\linewidth}
-  \centering
-  \stepTwoImageOrPlaceholder{figures/step2/Bird_raw_shaded.png}{Original mesh}
-\end{subfigure}\hfill
-\begin{subfigure}{0.48\linewidth}
-  \centering
-  \stepTwoImageOrPlaceholder{figures/step2/Bird_raw_wireframe.png}{Original mesh with wireframe}
-\end{subfigure}
-\caption{Bird model before resampling. Use the same viewing angle in both images so that the surface and triangle layout can be compared.}
-\label{fig:step2birdraw}
+\begin{figure}[htbp]\centering
+\includegraphics[width=0.85\linewidth]{hist_vertices_faces.png}
+\caption{Histograms of the number of vertices (left) and faces (right) per shape for all 2,483 shapes (logarithmic horizontal
+axis). The red line marks 100 vertices and the green lines mark the range of 5,000 to 10,000 vertices used in Step~2.3.}
+\label{fig:s22hist}
 \end{figure}
 
-\begin{figure}[htbp]
-\centering
-\begin{subfigure}{0.48\linewidth}
-  \centering
-  \stepTwoImageOrPlaceholder{figures/step2/Bird_refined_shaded.png}{Refined mesh}
-\end{subfigure}\hfill
-\begin{subfigure}{0.48\linewidth}
-  \centering
-  \stepTwoImageOrPlaceholder{figures/step2/Bird_refined_wireframe.png}{Refined mesh with wireframe}
-\end{subfigure}
-\caption{Bird model after resampling. Compare the overall shape with Figure~\ref{fig:step2birdraw}; the wireframe view shows the distribution of triangles in the refined mesh.}
-\label{fig:step2birdrefined}
+\paragraph{The average shape.} Both distributions are very skewed: the mean number of vertices is 5,610, but the median is only
+1,826, because a small number of very large shapes pulls the mean up. The median is therefore a better description of a typical
+shape. A typical shape in this database has about 1,800 vertices and 3,600 faces, so it is much coarser than the 5,000 to
+10,000 vertices used later: 1,733 shapes (69.8\,\%) have fewer than 5,000 vertices, 361 (14.5\,\%) are already in this range and
+389 (15.7\,\%) have more. The middle row of Figure~\ref{fig:s22gallery} shows the three shapes whose vertex count is closest to
+the median.
+
+\paragraph{Classes.} The classes are not balanced. Figure~\ref{fig:s22classes} shows that they contain between 15 and 143 shapes
+(36 on average), and that the typical resolution also differs a lot between classes. Without resampling, a descriptor could
+partly measure how finely a class was modeled instead of the shape itself.
+
+\begin{figure}[htbp]\centering
+\includegraphics[width=0.85\linewidth]{class_sizes_and_median_vertices.png}
+\caption{Number of shapes per class (top) and median number of vertices per class (bottom, logarithmic axis), with the classes
+sorted by size. The lines in the bottom plot mark 5,000 and 10,000 vertices.}\label{fig:s22classes}
 \end{figure}
 
-\subsection{Step 2.5: Translation and Scale Normalization}
+\paragraph{Outliers.} Two definitions of an outlier were used. The first is Tukey's rule~[12] on the vertex counts, which marks a
+shape as an outlier if $N_V > Q_3 + 1.5\,(Q_3-Q_1)$, with $Q_1$ and $Q_3$ the first and third quartile. This gives an upper limit
+of 15,032 vertices and marks 247 shapes (9.9\,\%) as large outliers, mostly from the classes Car (23), PlantIndoors (21),
+Tree (17), Bicycle (13) and Humanoid (11). The lower limit is negative, so there are no small outliers in this sense. The second
+definition is the one of the assignment: shapes with fewer than 100 or more than 100,000 vertices. 92 shapes have fewer than 100
+vertices and no shape has more than 100,000. Figure~\ref{fig:s22gallery} shows the three smallest and the three largest shapes
+next to three average ones. The smallest shapes are doors made of only 16 to 18 vertices, and the largest are plants with up to
+98,256 vertices.
 
-After resampling, the meshes were normalized so that their position and scale would
-not dominate later shape comparisons. First, the mean of all vertex positions was
-calculated and subtracted from each vertex. This places the vertex barycenter at the
-origin. Second, the largest dimension of the axis-aligned bounding box was scaled to
-one. The operation uses a single scale factor for all three coordinate axes, so it
-preserves the proportions of the model.
+\begin{figure}[htbp]\centering
+\includegraphics[width=0.8\linewidth]{gallery_outliers.png}
+\caption{The three smallest shapes (top row), the three shapes closest to the median vertex count (middle row) and the three
+largest shapes (bottom row), shown in the viewer of Step~1.}\label{fig:s22gallery}
+\end{figure}
 
-For a mesh with vertices \(v_i\), the vertex barycenter is
+\paragraph{Mesh quality.} Table~\ref{tab:s22quality} shows how many shapes have each kind of problem. Only 480 shapes (19.3\,\%)
+are closed surfaces, and more than a quarter of the shapes contain orientation conflicts or duplicate vertices. This is why the
+meshes are cleaned and reoriented before they are resampled (Section~\ref{sec:resampling}). It also means that features that need
+a volume will only be well defined for a minority of the shapes, which has to be taken into account in Step~3.
 
+\begin{table}[htbp]\centering\small
+\begin{tabular}{@{}lrr@{}}\toprule
+Problem & Shapes & \%\\\midrule
+orientation conflicts & 693 & 27.9\\
+closed part that is inside-out (negative signed volume) & 375 & 15.1\\
+duplicate vertices & 698 & 28.1\\
+unused vertices & 71 & 2.9\\
+degenerate triangles & 454 & 18.3\\
+non-manifold edges & 1,350 & 54.4\\
+not closed (boundary or non-manifold edges) & 2,003 & 80.7\\
+\bottomrule\end{tabular}
+\caption{Number and percentage of the 2,483 original shapes that have each kind of mesh problem.}\label{tab:s22quality}
+\end{table}
+
+\subsection{Step 2.3: Resampling}\label{sec:resampling}
+The aim of the resampling is to bring all shapes to a similar number of vertices without changing their shape. Every mesh goes
+through the same steps: cleaning, orientation, refinement or decimation, and a second orientation pass at the end.
+
+\paragraph{Target.} The target is $V_{\text{target}}=7{,}500$ vertices, the middle of the range of 5,000 to 10,000 vertices
+suggested in the assignment. This is a fixed value and not the average of the database: the average of 5,610 vertices (or the
+median of 1,826) would be too coarse for the descriptors of Step~3. A shape is accepted if its vertex count is in $[N_{lo},N_{hi}]=[5{,}000,\,10{,}000]$. Shapes
+inside this range are only cleaned and reoriented, shapes below it are refined and shapes above it are decimated. Only treating
+the extreme shapes (fewer than 100 or more than 100,000 vertices) was also considered, but it would change only 92 shapes and
+leave resolutions between 100 and 98,000 vertices in the database, which is too much variation for the descriptors of Step~3.
+
+\paragraph{Cleaning.} First, vertices with exactly the same coordinates are merged, i.e. $v_i$ and $v_k$ become one vertex if
+$v_i=v_k$. Without this, neighboring faces that use different copies of the same point are not connected, and the decimation
+cannot work across these seams. Then degenerate triangles (two equal corners, or area $A_t\le10^{-12}\,d(M)^2$), duplicated
+faces and unused vertices are removed. Cleaning was needed for a large part of the database:
+698 shapes had duplicate vertices (1,438,321 vertices were merged in total), 917 had duplicated faces, 454 had degenerate
+triangles and 71 had unused vertices.
+
+\paragraph{Orientation.} The orientation is made consistent by walking over the mesh from face to face. In every connected part,
+one start face is kept as it is. When the walk moves from a face $f$ to a neighbor $g$ over a shared edge, the neighbor is
+flipped if the two faces list this edge in the same direction:
+\begin{equation}
+  \mathit{flip}(f_{\text{start}})=0,\qquad
+  \mathit{flip}(g)=\mathit{flip}(f)\ \mathrm{XOR}\ \mathit{same}(f,g),
+  \label{eq:orientflip}
+\end{equation}
+where $\mathit{same}(f,g)=1$ if $f$ and $g$ list the shared edge in the same direction. Faces with $\mathit{flip}=1$ get their
+vertex order reversed. After that, every connected part that is closed or almost closed (at most 1\,\% of its faces touch a boundary
+or non-manifold edge) and has a negative signed volume~\eqref{eq:signedvolume} is turned inside-out as a whole, so that its
+normals point outwards. For open parts the sign of the volume has no meaning, so they are left as they are. Because the decimation can
+create new conflicts, the same orientation pass is run again at the end. After cleaning, 882 shapes had orientation conflicts;
+after the final pass 63 shapes are left. They contain folded or non-orientable parts that cannot be fixed this way, so they are
+kept but marked in the log.
+
+\paragraph{Refinement.} Shapes with fewer than 5,000 vertices are refined by splitting long edges. Every edge that is longer than
+a length $L$ is split in the middle, and every triangle is divided according to how many of its edges were split, keeping its
+orientation. This is repeated until no edge is longer than $L$. Because only long edges are split, large triangles are refined and
+small ones are left alone, which makes the triangle sizes more even. If the surface with area $A$ were covered by equilateral
+triangles with edge length $L$, it would have about $4A/(\sqrt3L^2)$ triangles and half as many vertices. This gives the
+starting value
+\begin{equation}
+  L_0 = 1.4\sqrt{\frac{4A}{\sqrt3\cdot 2\,V_{\text{target}}}},
+  \label{eq:refineL}
+\end{equation}
+where the factor 1.4 compensates for the fact that after splitting the edges are between $L/2$ and $L$ long. Since $N_V$ grows
+with $1/L^2$, the length is corrected after each attempt with $L \leftarrow L\sqrt{N_V/V_{\text{target}}}$, and the refinement is
+started again from the cleaned mesh, at most eight times. The result in the accepted range that is closest to $V_{\text{target}}$
+is kept.
+
+\paragraph{Decimation.} Shapes with more than 10,000 vertices are simplified with quadric error metric decimation~[13] from
+Open3D~[9]. Every vertex gets a matrix $Q_v=\sum_p \mathbf p\mathbf p^{\mathsf T}$, summed over the planes
+$\mathbf p=(a,b,c,d)$ of its neighboring triangles. The method repeatedly merges the two end points of the edge with the lowest
+cost
+\begin{equation}
+  \mathrm{cost}(v_1,v_2)=\bar{\mathbf v}^{\mathsf T}(Q_{v_1}+Q_{v_2})\,\bar{\mathbf v},
+  \label{eq:quadric}
+\end{equation}
+where $\bar{\mathbf v}$ is the new merged vertex in homogeneous coordinates, i.e. the edge whose removal changes the surface least.
+This is repeated until a given number of triangles is left. The number of triangles is corrected up to five times until the vertex
+count is within 10\,\% of $V_{\text{target}}$. To make sure that the decimation does not destroy a shape, every result is compared with the original
+surface using the Hausdorff distance, i.e. the largest distance between a point on one surface and the closest point on the other.
+It is estimated from random points on both surfaces:
+\begin{equation}
+  \delta_H = \frac{1}{d(M)}\,\max\Big(\max_{p\in P_1}\,\min_{q\in S_2}\lVert p-q\rVert,\;\max_{p\in P_2}\,\min_{q\in S_1}\lVert p-q\rVert\Big),
+  \label{eq:hausdorff}
+\end{equation}
+where $S_1$ and $S_2$ are the original and the decimated surface, $P_1$ and $P_2$ are 20,000 random points on them and $d(M)$ is
+the bounding-box diagonal. Because only sample points are used, $\delta_H$ is an estimate of the exact Hausdorff distance. A result is accepted if it is in the range of 5,000 to 10,000 vertices and $\delta_H\le 5\,\%$.
+Otherwise two other methods are tried: quadric decimation with a higher weight on the boundary edges, and vertex clustering~[14],
+which puts a grid with cell size $s$ over the shape and replaces all vertices in one grid cell by their average. The cell size
+$s$ is found by bisection so that the vertex count is close to $V_{\text{target}}$. The best of the accepted results is kept.
+
+\paragraph{Reduced database.} As suggested in the assignment, the method was first developed on a reduced, balanced database
+before it was run on all shapes. This database contains three random shapes of every class (207 shapes), plus the five smallest
+and the five largest shapes of the whole database as extra difficult cases, so 217 shapes in total. All 217 shapes ended in the
+range of 5,000 to 10,000 vertices (mean 7,528, standard deviation 764). On this database, the edge-splitting refinement was also
+compared with a simpler method that splits every triangle into four until the target is passed and then decimates back to the
+target. The simpler method made the triangle sizes less even (median CV from 2.31 to 6.12, see Eq.~\eqref{eq:cv}), while the
+edge-splitting refinement made them more even (median CV 0.88), so the edge-splitting refinement was used.
+
+\paragraph{Results.} All 2,483 shapes were processed without errors, in about 6.5 minutes on 8 processor cores. 1,754 shapes
+were refined, 362 decimated and 367 kept. All shapes now have between 5,010 and 9,961 vertices, with a mean of 7,506
+(Table~\ref{tab:s23results}). No shape had to be removed, so the classes still contain 15 to 143 shapes. The refinement does not
+move the surface at all (largest $\delta_H = 0.09\,\%$) and makes the triangle sizes more even. The decimation moves the surface
+only a little: $\delta_H$ is below 2.3\,\% for 95\,\% of the decimated shapes and at most 4.7\,\%.
+
+\begin{table}[htbp]\centering\small
+\begin{tabular}{@{}lrrrrrrr@{}}\toprule
+$N_V$ & mean & std.\ dev. & min & 25\,\% & median & 75\,\% & max\\\midrule
+original        & 5,610 & 9,851 & 16    & 490   & 1,826 & 6,306 & 98,256\\
+after cleaning  & 5,019 & 8,144 & 16    & 480   & 1,724 & 6,072 & 73,440\\
+after resampling & 7,506 & 779  & 5,010 & 7,200 & 7,591 & 7,960 & 9,961\\
+\bottomrule\end{tabular}
+\caption{Number of vertices of all 2,483 shapes in the original files, after cleaning and after resampling.}\label{tab:s23results}
+\end{table}
+
+\paragraph{Shapes for which the normal decimation fails.} With quadric decimation alone, six shapes gave a bad result
+(Table~\ref{tab:s23exceptions}). Four Houses are scenes made of thousands of separate parts (roof tiles, walls and a ground plate).
+For three of them the decimation removed the walls and the ground plate and left only the roof, and for the fourth it removed the
+ground plate; the surface moved by 13 to 19\,\% of the diagonal. The PlantIndoors and Tree shapes consist of thousands of small
+loose leaves, and the decimation could not reach the target range. These cases are the reason why the Hausdorff check and the two
+other methods were added. With them, all six shapes are in the accepted range and none moves by more than 4.5\,\%
+(Figures~\ref{fig:s23houses} and~\ref{fig:s23plants}).
+
+\begin{table}[htbp]\centering\small
+\begin{tabular}{@{}lrrrlrr@{}}\toprule
+ & & \multicolumn{2}{c}{quadric only} & \multicolumn{3}{c}{final result}\\\cmidrule(lr){3-4}\cmidrule(l){5-7}
+Shape & $N_V$ cleaned & $N_V$ & $\delta_H$ (\%) & method & $N_V$ & $\delta_H$ (\%)\\\midrule
+House D00286        & 28,394 & 11,130 & 18.6 & vertex clustering & 7,533 & 0.5\\
+House D00901        & 17,182 & 11,136 & 18.5 & vertex clustering & 7,326 & 0.3\\
+House D00574        & 15,615 & 7,199  & 16.1 & vertex clustering & 7,473 & 0.8\\
+House D00903        & 28,000 & 8,761  & 12.9 & vertex clustering & 7,293 & 1.2\\
+PlantIndoors D00080 & 64,126 & 3,144  & 7.0  & vertex clustering & 7,397 & 4.5\\
+Tree D00765         & 29,924 & 2,863  & 3.7  & quadric, boundary weight & 7,122 & 2.4\\
+\bottomrule\end{tabular}
+\caption{The six shapes for which quadric decimation alone fails: vertex count and Hausdorff distance after quadric decimation,
+and method, vertex count and Hausdorff distance of the final result.}\label{tab:s23exceptions}
+\end{table}
+
+\begin{figure}[htbp]\centering
+\includegraphics[width=0.62\linewidth]{exceptions_houses.png}
+\caption{The four House shapes of Table~\ref{tab:s23exceptions}: cleaned original (left), result of quadric decimation alone
+(middle) and final result with vertex clustering (right).}\label{fig:s23houses}
+\end{figure}
+
+\begin{figure}[htbp]\centering
+\includegraphics[width=0.62\linewidth]{exceptions_plant_tree.png}
+\caption{PlantIndoors D00080 and Tree D00765: cleaned original (left), result of quadric decimation alone (middle) and final
+result (right).}\label{fig:s23plants}
+\end{figure}
+
+\subsection{Step 2.4: Checking the Resampling}\label{sec:s24}
+The resampled database was checked with the statistics tool of Step~2.2 and with the viewer of Step~1. First, the tool was run
+again on the resampled files themselves, and not only on the processing log, so that the check uses what was actually written
+to disk. The output folder contains 2,483 files, one for every shape in the log, and the vertex and face counts in the files are
+the same as in the log for all shapes. Table~\ref{tab:s24ranges} gives the ranges of the vertex and face counts, and
+Figure~\ref{fig:s24hist} compares the distributions before and after the resampling.
+
+\begin{table}[htbp]\centering\small
+\begin{tabular}{@{}lrr@{}}\toprule
+Measure & Minimum & Maximum\\\midrule
+Original vertices & 16 & 98,256\\
+Vertices after cleaning & 16 & 73,440\\
+Vertices after resampling & 5,010 & 9,961\\
+Faces after resampling & 2,842 & 20,270\\
+\bottomrule\end{tabular}
+\caption{Smallest and largest mesh sizes before and after the resampling.}\label{tab:s24ranges}
+\end{table}
+
+\begin{figure}[htbp]\centering
+\includegraphics[width=\linewidth]{step2_4_histograms.png}
+\caption{Original (outline) and resampled (filled) database: (a) number of vertices, with the target range marked in green,
+(b) number of faces, (c) coefficient of variation of the triangle areas, where 0 means that all triangles of a shape have the
+same area. Values of 6 and more are collected in the last bin of (c).}\label{fig:s24hist}
+\end{figure}
+
+All 2,483 shapes are in the target range, with a mean of 7,506 vertices and a standard deviation of 779 (9,851 before). The
+number of faces has a mean of 14,429 and a standard deviation of 2,102. To see whether the triangles also became more even, the
+coefficient of variation of the triangle areas,
+\begin{equation}
+  \mathrm{CV}(M)=\frac{\sigma_A}{\mu_A},
+  \label{eq:cv}
+\end{equation}
+was computed for every shape, where $\mu_A$ and $\sigma_A$ are the mean and the standard deviation of the triangle areas $A_t$.
+The median CV went down from 2.46 to 1.07, so the triangle sizes are clearly more even after the resampling
+(Figure~\ref{fig:s24hist}c). The decimated shapes improve less than the refined ones, because quadric decimation keeps the shape
+and not the triangle size.
+
+For the visual check, three shapes were opened in the viewer before and after the resampling: a refined, a decimated and a kept
+shape (Figure~\ref{fig:s24viewer}). The Bird is refined from 233 to 7,452 vertices and keeps its shape, but its triangles are now
+much smaller. The Humanoid is decimated from 11,806 to 7,559 vertices; the mesh is coarser, but the arms, legs and fingers are still
+there. The balloon (AircraftBuoyant m1338) already had 8,761 vertices and is the same before and after. The processing log and the
+statistics were saved as a print-out (CSV and text files), as asked in the assignment.
+
+\begin{figure}[htbp]\centering
+\begin{subfigure}{0.32\linewidth}\centering\includegraphics[width=\linewidth]{Bird_raw_wireframe.png}\caption{Bird, before}\end{subfigure}\hfill
+\begin{subfigure}{0.32\linewidth}\centering\includegraphics[width=\linewidth]{Humanoid_raw_wireframe.png}\caption{Humanoid, before}\end{subfigure}\hfill
+\begin{subfigure}{0.32\linewidth}\centering\includegraphics[width=\linewidth]{Kept_raw_wireframe.png}\caption{Balloon, before}\end{subfigure}\\[4pt]
+\begin{subfigure}{0.32\linewidth}\centering\includegraphics[width=\linewidth]{Bird_refined_wireframe.png}\caption{Bird, after (refined)}\end{subfigure}\hfill
+\begin{subfigure}{0.32\linewidth}\centering\includegraphics[width=\linewidth]{Humanoid_refined_wireframe.png}\caption{Humanoid, after (decimated)}\end{subfigure}\hfill
+\begin{subfigure}{0.32\linewidth}\centering\includegraphics[width=\linewidth]{Kept_refined_wireframe.png}\caption{Balloon, after (kept)}\end{subfigure}
+\caption{Viewer check of the resampling with the wireframe shown: Bird D00089 (233 $\rightarrow$ 7,452 vertices), Humanoid m253
+(11,806 $\rightarrow$ 7,559 vertices) and AircraftBuoyant m1338 (8,761 vertices, unchanged).}\label{fig:s24viewer}
+\end{figure}
+
+\subsection{Step 2.5: Translation and Scale Normalization}\label{sec:s25}
+After the resampling, the meshes were normalized so that their position and size do not influence later comparisons. First, the
+mean of all vertex positions was calculated and subtracted from each vertex. This places the barycenter at the origin. Second,
+the largest side of the axis-aligned bounding box was scaled to one. The same scale factor is used for all three axes, so the
+proportions of the shape do not change.
+
+For a mesh with vertices $v_i$, the barycenter is
 \begin{equation}
 \bar{v}=\frac{1}{N_V}\sum_{i=1}^{N_V}v_i.
 \label{eq:step2barycenter}
 \end{equation}
-
-The translated vertices are \(v_i'=v_i-\bar{v}\). Let the bounding-box extents of
-the translated mesh be
-
+The translated vertices are $v_i'=v_i-\bar{v}$. Let the bounding-box sides of the translated mesh be
 \begin{equation}
 \Delta_x=x_{\max}-x_{\min},\qquad
 \Delta_y=y_{\max}-y_{\min},\qquad
 \Delta_z=z_{\max}-z_{\min}.
 \label{eq:step2extents}
 \end{equation}
-
-The largest extent is \(L=\max(\Delta_x,\Delta_y,\Delta_z)\). The normalized vertices
-are obtained with the uniform scale factor \(s=1/L\):
-
+The largest side is $L_{\max}=\max(\Delta_x,\Delta_y,\Delta_z)$, and the normalized vertices are
 \begin{equation}
-\hat{v}_i=\frac{v_i-\bar{v}}{L}.
+\hat{v}_i=\frac{v_i-\bar{v}}{L_{\max}}.
 \label{eq:step2normalization}
 \end{equation}
+After this, the barycenter is at the origin (up to rounding errors) and the largest side of the bounding box is one; the other two
+sides are at most one. Translation and scaling do not change which vertices form a face, so the faces are kept unchanged. Note
+that the shape fits in a cube of side one, but this cube does not have to be centered at the origin, because the barycenter is
+usually not the middle of the bounding box.
 
-After this transformation, the barycenter is at the origin (up to floating-point
-precision), and the largest bounding-box dimension is one. The other two dimensions
-are at most one. Translation and uniform scaling do not change the mesh connectivity,
-so the face definitions remain unchanged.
+The normalized meshes were saved in a separate folder. To verify the result, all output files were read again and the distance of
+the barycenter to the origin, the largest bounding-box side and the number of faces were checked for every shape
+(Table~\ref{tab:step2normalization}). Figure~\ref{fig:step2birdnormalized} shows the Bird after the normalization.
 
-The normalized meshes were saved to \texttt{processed/step2\_normalized/}. A
-verification pass re-read the output meshes and checked the centre error, the largest
-bounding-box dimension, and whether the face count was preserved.
-
-\begin{table}[htbp]
-\centering
-\small
-\begin{tabular}{@{}lr@{}}
-\toprule
-Normalization check & Result \\
-\midrule
-Input meshes & 2,483 \\
-Normalized OBJ files & 2,483 \\
-Shapes verified & 2,483 \\
-Shapes passing all checks & 2,483 \\
-Shapes failing & 0 \\
-Mean centre error & \(2.03\times10^{-14}\) \\
-Maximum centre error & \(4.09\times10^{-13}\) \\
-Minimum largest dimension & 0.9999999999997 \\
-Maximum largest dimension & 1.0000000000002 \\
-Face counts preserved & Yes, for all shapes \\
-Normalization errors & 0 \\
-Verification errors & 0 \\
-\bottomrule
-\end{tabular}
-\caption{Verification results for the normalized database. Small centre and scale differences are due to floating-point precision.}
-\label{tab:step2normalization}
+\begin{table}[htbp]\centering\small
+\begin{tabular}{@{}lr@{}}\toprule
+Normalization check & Result\\\midrule
+Input meshes & 2,483\\
+Normalized OBJ files & 2,483\\
+Shapes passing all checks & 2,483\\
+Shapes failing & 0\\
+Mean distance of the barycenter to the origin & $2.03\times10^{-14}$\\
+Largest distance of the barycenter to the origin & $4.09\times10^{-13}$\\
+Largest bounding-box side (minimum / maximum) & 1.0000000000 / 1.0000000000\\
+Face counts unchanged & yes, for all shapes\\
+\bottomrule\end{tabular}
+\caption{Verification of the translation and scale normalization over all shapes. The small distances of the barycenter to the
+origin are rounding errors.}\label{tab:step2normalization}
 \end{table}
 
-\begin{figure}[htbp]
-\centering
-\begin{subfigure}{0.48\linewidth}
-  \centering
-  \stepTwoImageOrPlaceholder{figures/step2/Bird_normalized_shaded.png}{Normalized mesh}
-\end{subfigure}\hfill
-\begin{subfigure}{0.48\linewidth}
-  \centering
-  \stepTwoImageOrPlaceholder{figures/step2/Bird_normalized_wireframe.png}{Normalized mesh with wireframe}
-\end{subfigure}
-\caption{Bird model after normalization. The model is centred at its vertex barycenter and its largest bounding-box dimension is one.}
+\begin{figure}[htbp]\centering
+\begin{subfigure}{0.45\linewidth}\centering\includegraphics[width=\linewidth]{Bird_normalized_shaded.png}\caption{shaded}\end{subfigure}\hfill
+\begin{subfigure}{0.45\linewidth}\centering\includegraphics[width=\linewidth]{Bird_normalized_wireframe.png}\caption{with wireframe}\end{subfigure}
+\caption{Bird D00089 after resampling and normalization: barycenter at the origin and largest bounding-box side equal to one.}
 \label{fig:step2birdnormalized}
 \end{figure}
 
 \subsection{Discussion}
+The analysis showed that the database is very mixed. The shapes have between 16 and 98,256 vertices, the classes have between 15
+and 143 shapes, and many meshes have problems such as duplicate vertices, orientation conflicts or holes. Only about one fifth of
+the shapes are closed surfaces.
 
-The preprocessing results show that the pipeline was applied to the entire database,
-not only to the examples used for testing. The original files were scanned, the
-resampling log was generated, and the number of refined output files matched the
-number of input shapes. Every resampled mesh fell within the target vertex range of
-5,000--10,000. This reduces large differences in mesh resolution while retaining
-the shape as a triangle mesh.
+After the preprocessing, all 2,483 shapes have between 5,010 and 9,961 vertices and no shape was lost. The refinement keeps the
+surface exactly in place and makes the triangles more even. The decimation changes the surface by at most 4.7\,\% of the diagonal,
+but it does not make the triangles more even, so shapes that were decimated still have quite different triangle sizes. A remeshing
+method that also equalizes the triangles could improve this, but such methods often fail on open and non-manifold meshes, which
+are very common in this database.
 
-Normalization addresses a different issue. Resampling controls the number of
-vertices, whereas normalization controls position and scale. Moving each barycenter
-to the origin makes the coordinate systems more comparable, and scaling the largest
-bounding-box dimension to one gives every shape a common overall scale. The
-verification results support that both conditions were met to numerical precision,
-and the face counts were preserved.
-
-There are also limits to what these checks establish. A mesh can meet the vertex
-target and normalization conditions while still having local geometric defects.
-Likewise, a successful processing status does not by itself prove that every surface
-is visually perfect or consistently oriented. Visual inspection of representative
-original, refined, and normalized models is therefore useful alongside the numerical
-checks. The orientation diagnostic should also be reported separately from the
-resampling status.
+Some problems are still left. 63 shapes are not consistently oriented, and most shapes are not closed. For Step~3 this means that
+volume-based features such as compactness, rectangularity and convexity have to be computed carefully, for example by checking
+whether a shape is closed. The six shapes of Table~\ref{tab:s23exceptions} also show that a general method can fail on unusual
+shapes, so it was important to check every result with the Hausdorff distance and not only with the vertex count.
 
 \subsection{Conclusion}
+Step~2 prepared all 2,483 shapes for the next steps. The analysis tool measures the class, size, face type and bounding box of
+every shape, and the statistics showed a strongly skewed and unbalanced database with many mesh problems. After cleaning,
+reorientation and resampling, all shapes are in the range of 5,000 to 10,000 vertices, and a check with the statistics tool and
+the viewer confirmed this. Finally, all shapes were moved to the origin and scaled to a largest side of one. These normalized shapes
+are the input of the full normalization in Section~\ref{sec:normalization}.
 
-Step 2 prepared all 2,483 shapes for the later stages of the retrieval system. The
-full-database resampling run completed with no reported processing failures, and
-every output mesh contained between 5,010 and 9,961 vertices. The output database
-therefore satisfies the selected 5,000--10,000 vertex target.
+% =============================================================================================
+\section{Step 3: Feature Extraction}\label{sec:step3}
+% =============================================================================================
 
-The normalization step also completed for all 2,483 meshes. The mean centre error
-was approximately \(2.03\times10^{-14}\), the largest bounding-box dimension was
-one within floating-point precision, and all face counts were preserved. The refined
-meshes are available in \texttt{processed/step2\_full/}, and the normalized meshes
-are available in \texttt{processed/step2\_normalized/}. These outputs provide a
-consistent starting point for the next stages of the multimedia retrieval assignment.
+Step~3 consists of two parts: the full normalization of the shapes (Step~3.1) and the computation of the 3D shape descriptors
+(Step~3.2). This version of the report contains Step~3.1. Step~3.2 is still in progress and will follow later.
+
+\subsection{Step 3.1: Full Normalization}\label{sec:normalization}
+
+\paragraph{Aim.}
+Before features are computed, all shapes have to be in the same position, orientation and size, so that the features describe
+the shape and not how it was stored in its file. The lecture slides give a normalization pipeline with four steps~[15]:
+translation, alignment, flipping and scaling. Translation and scaling were already done in Step~2.5. Step~3.1 adds the alignment
+and the flipping, and repeats the scaling at the end. Its input is the output of Step~2.5, so all shapes are already resampled,
+centered and scaled.
+
+\paragraph{Translation.}
+The barycenter $\bar v$ is the mean of the vertices (Eq.~\eqref{eq:step2barycenter}), as in Step~2.5. The translation
+$v_i\leftarrow v_i-\bar v$ is part of the pipeline so that it also works for shapes that did not go through Step~2.5, for
+example a query shape. For the shapes of Step~2.5 it changes nothing, because they are already centered.
+
+\paragraph{Alignment.}
+The covariance matrix of the vertices is computed as in the lecture slides~[15]:
+\begin{equation}
+  \Sigma=\frac1{N_V-1}\sum_{i=1}^{N_V}(v_i-\bar v)(v_i-\bar v)^{\mathsf T}.
+  \label{eq:covariance}
+\end{equation}
+Its eigenvalues $\lambda_1\ge\lambda_2\ge\lambda_3$ and unit eigenvectors $e_1,e_2,e_3$ give the directions in which the
+shape is most, medium and least spread out. Every vertex of the centered shape is then projected onto these directions:
+\begin{equation}
+  x_i\leftarrow v_i\cdot e_1,\qquad y_i\leftarrow v_i\cdot e_2,\qquad z_i\leftarrow v_i\cdot(e_1\times e_2).
+  \label{eq:alignment}
+\end{equation}
+For the third axis, $e_1\times e_2$ is used instead of $e_3$. PCA only gives directions, so $e_1,e_2,e_3$ could form a
+left-handed coordinate system, which would mirror the shape. With the cross product the new axes are always right-handed, so the
+projection is a pure rotation and the faces keep their orientation. The signs of $e_1$ and $e_2$ are still arbitrary; this is
+fixed in the next step.
+
+\paragraph{Flipping.}
+The moment test of the lecture slides~[15] checks on which side of each axis the shape has more mass. Every triangle counts with
+the squared distance of its center to the plane through the origin:
+\begin{equation}
+  f_k=\sum_{t=1}^{N_F}\operatorname{sign}(C_{t,k})\,C_{t,k}^2,\qquad
+  s_k=\begin{cases}+1 & f_k\ge 0\\-1 & f_k<0\end{cases},\qquad
+  v_{i,k}\leftarrow s_k\,v_{i,k},
+  \label{eq:flip}
+\end{equation}
+where $C_{t,k}$ is coordinate $k\in\{x,y,z\}$ of the center $C_t$ of triangle $t$. If $f_k$ is negative, the shape is mirrored along
+that axis, so afterwards $f_k\ge0$ for all three axes. $f_k=0$ is counted as
+positive, so that no axis is multiplied by zero. If an odd number of axes is mirrored ($s_xs_ys_z=-1$), the mirroring reverses the
+orientation of every face. In that case the vertex order of all faces is reversed, so that the faces keep the same orientation as
+before the mirroring.
+
+\paragraph{Scaling.}
+The rotation changes the bounding box, so after the alignment the largest side is in general no longer one. The scaling of
+Step~2.5 is therefore applied again, using the largest side of the new bounding box:
+\begin{equation}
+  D_{\max}=\max\big(x_{\max}-x_{\min},\;y_{\max}-y_{\min},\;z_{\max}-z_{\min}\big),\qquad v_i\leftarrow v_i/D_{\max}.
+  \label{eq:dmax}
+\end{equation}
+After the alignment, the axis-aligned bounding box is the same as the oriented bounding box of the shape.
+
+\paragraph{Order of the steps.}
+The order is the one from the lecture slides and the technical tips. The translation comes first, because the projection and
+the moment test are computed around the origin. The flipping needs the aligned axes. The scaling comes last, because the bounding
+box changes with the rotation. Mirroring and scaling do not move the barycenter away from the origin, so the translation stays
+correct.
+
+\paragraph{Implementation.}
+The four steps are separate functions (\texttt{center}, \texttt{align}, \texttt{flip} and \texttt{scale}) in the file
+\path{mr_normalize.py}, written with NumPy~[5]. The eigenvectors are computed with \texttt{numpy.linalg.eigh}. The functions
+\texttt{center} and \texttt{scale} use the same formulas as Step~2.5. The script \path{run_step3_1.py} normalizes all shapes in
+about four minutes on eight cores and saves them as the input for the feature extraction.
+
+\paragraph{Test on a known shape.}
+Before running the whole database, the pipeline was tested on a box of $4\times2\times1$ with one enlarged end, so that its mass is
+not symmetric. The box was rotated, mirrored, moved and enlarged in six random ways. All six results were identical to the
+normalized original box (largest difference $3\cdot10^{-16}$), had the expected size $1\times0.8\times0.4$, had the heavy end on the
+positive $x$ axis and still had outward normals.
+
+\paragraph{Verification on the whole database.}
+For each step, the value that the step should fix was measured on all 2,483 shapes (Table~\ref{tab:normcheck},
+Figure~\ref{fig:normhist}). The values ``before'' come from the resampled shapes of Step~2.3, i.e. before Step~2.5 and Step~3.1,
+so that the table shows the effect of all four normalization steps together. The values after the normalization were measured on
+the files as they were saved. It was also checked that the input from Step~2.5 is really centered and scaled: the largest distance
+of its barycenter to the origin is $4.1\cdot10^{-13}$ and its largest side is exactly one for all shapes.
+
+\begin{table}[htbp]\centering\small
+\begin{tabular}{@{}lllll@{}}\toprule
+Step & Measure & Target & Before & After\\\midrule
+Translation & $\lVert \bar v\rVert$ & 0 & median 0.57, max $1.9\cdot10^{8}$ & max $1.2\cdot10^{-12}$\\
+Alignment & angle$(e_1,x)$ & $0^\circ$ & median $52.0^\circ$ & below $10^{-6}$\,\textdegree\\
+          & angle$(e_2,y)$ & $0^\circ$ & -- & max $2.1\cdot10^{-6}$\,\textdegree\\
+Flipping & shapes with some $f_k<0$ & 0 & 800 & 0\\
+Scaling & $D_{\max}$ & 1 & 0.067 to $4.6\cdot10^{8}$ & 1.0000000 for all shapes\\
+\bottomrule\end{tabular}
+\caption{The normalization measures before (resampled shapes of Step~2.3) and after the full normalization, over all 2,483
+shapes. The angles after normalization are given for the shapes whose eigenvalues differ by more than 1\,\% (2,450 shapes
+for $e_1$, 2,341 shapes for $e_2$; see the text on shapes with unclear axes).}
+\label{tab:normcheck}
+\end{table}
+
+\begin{figure}[htbp]\centering
+\includegraphics[width=\linewidth]{normalization_histograms.png}
+\caption{Histograms of the four normalization measures over all 2,483 shapes, before (outline) and after (filled) the
+normalization: (a) distance of the barycenter to the origin, (b) angle between the major eigenvector and the $x$ axis,
+(c) number of axes that fail the moment test, (d) largest side of the bounding box. Axes (a) and (d) are logarithmic,
+because the original shapes range over 17 orders of magnitude in position and size.}
+\label{fig:normhist}
+\end{figure}
+
+\paragraph{Shapes with unclear axes.}
+An eigenvector is only well defined if its eigenvalue is different from the others. For 33 shapes, $\lambda_1$ and $\lambda_2$
+differ by less than 1\,\%, and for 109 more shapes $\lambda_2$ and $\lambda_3$ do. Most of them are rotationally symmetric objects
+such as cups, chess pieces, round tables and bottles. For such a shape, any direction in the plane of the two equal eigenvalues is
+a valid axis. The alignment is still a correct rotation, but the angle around the remaining axis is random. The lecture slides
+show the same effect for two of their example cups~[15]. The chess piece in Figure~\ref{fig:normexamples} is one of these
+shapes. Features that do not depend on the rotation are not affected.
+
+\paragraph{Orientation of the faces.}
+The normalization must not turn faces inside-out. Without the translation, the whole normalization maps every vertex to $vL$ with
+a linear map $L$ (rotation, mirroring and uniform scaling). For such a map, the normal of a face has to point along $n_jL$ afterwards.
+This was checked for every face of every shape, with $L$ computed from the vertex positions before and after. None of the
+35.8 million faces points in the wrong direction, also for the 1,280 shapes that were mirrored by the moment test. Very thin
+triangles with less than $10^{-4}$ of the median triangle area (36,505 faces) were skipped, because their corners are stored with
+seven digits and the direction of their normal is only rounding noise. In addition, the signed
+volume~\eqref{eq:signedvolume} has the same sign before and after the normalization for all 572 shapes whose parts are all closed
+or almost closed (the same rule as in the orientation step of Section~\ref{sec:resampling}). This number is higher than the 480
+closed shapes of Table~\ref{tab:s22quality}, because that table counts the original meshes before cleaning and only strictly closed
+meshes.
+
+\paragraph{Statistics tool of Step~2.}
+Finally, the statistics tool of Step~2.2 was run on the database before and after the normalization. Both have the same numbers of
+vertices and faces for every shape and the same number of orientation conflicts, so the normalization only moved the vertices and
+did not change the meshes. After the normalization, the largest side of the bounding box is one for every shape.
+
+\paragraph{Visual check.}
+Figure~\ref{fig:normexamples} shows four shapes before and after the normalization, with the $x$ (red), $y$ (green) and
+$z$ (blue) axes drawn at the origin. After the normalization, the direction in which the vertices are spread out most lies along
+$x$ and the second one along $y$. For most shapes this is also the longest side of the bounding box (2,276 of the 2,483 shapes),
+but not for all, because PCA uses the spread of all vertices and not only the outer extent of the shape. The sword was stored along the $z$ axis and the humanoid upright along $y$; both now lie along $x$. The bicycle
+was already aligned, but it was mirrored by the moment test. The chess piece is one of the rotationally symmetric shapes.
+
+\newcommand{\normpair}[3]{%
+\begin{subfigure}{0.245\linewidth}\centering\includegraphics[width=\linewidth]{#1_before.png}\caption{#2, before}\end{subfigure}\hfill
+\begin{subfigure}{0.245\linewidth}\centering\includegraphics[width=\linewidth]{#1_after.png}\caption{#2, after}\end{subfigure}#3}
+\begin{figure}[htbp]\centering
+\normpair{Sword_m702}{Sword m702}{\hfill}
+\normpair{Humanoid_m213}{Humanoid m213}{\par\medskip}
+\normpair{Bicycle_D00016}{Bicycle D00016}{\hfill}
+\normpair{Chess_m1608}{Chess m1608}{}
+\caption{Four shapes before and after the full normalization, with the $x$ (red), $y$ (green) and $z$ (blue) axes drawn
+from the origin. All views are taken from the same direction, with $x$ pointing to the right and $y$ upwards.}
+\label{fig:normexamples}
+\end{figure}
+
+\paragraph{Discussion.}
+All 2,483 shapes passed the checks of the full normalization: every shape has its barycenter at the origin, its principal axes
+along $x$ and $y$, a positive moment $f_k$ on each axis and a largest side of one. Step~3.1 starts from the output of Step~2.5
+and uses the same barycenter, so the two steps give the same result as running all four normalization steps at once. The main
+limitation is the group of 142 shapes with unclear axes, whose rotation around one axis is random. This does not matter for rotation-invariant features such as the
+distributions A3 and D1--D4, but it has to be kept in mind for features that depend on the orientation.
 
 \clearpage
 \section*{References}
@@ -723,11 +970,18 @@ consistent starting point for the next stages of the multimedia retrieval assign
 \item[{[8]}] Plotly Technologies Inc., Kaleido, version 1.4.0. Available: \url{https://github.com/plotly/Kaleido}. Used to export
   images of the rendered shapes for this report.
 \item[{[9]}] Open3D Development Team, Open3D, version 0.20.0. Available: \url{https://www.open3d.org}. Used for the standalone
-  mesh viewer.
+  mesh viewer and for the decimation.
 \item[{[10]}] J. D. Hunter, Matplotlib: A 2D graphics environment, \emph{Computing in Science \& Engineering}, 9(3):90--95,
   2007. Matplotlib version 3.11.2. Available: \url{https://matplotlib.org}.
 \item[{[11]}] The Tectonic Project, Tectonic: a modernized, complete, self-contained TeX/LaTeX engine, version 0.17.0. Available:
   \url{https://tectonic-typesetting.github.io}.
+\item[{[12]}] J. W. Tukey, \emph{Exploratory Data Analysis}, Addison-Wesley, 1977.
+\item[{[13]}] M. Garland and P. S. Heckbert, Surface simplification using quadric error metrics, \emph{Proceedings of SIGGRAPH},
+  209--216, 1997.
+\item[{[14]}] J. Rossignac and P. Borrel, Multi-resolution 3D approximations for rendering complex scenes, in \emph{Modeling in
+  Computer Graphics}, Springer, 455--465, 1993.
+\item[{[15]}] A. C. Telea, Multimedia Retrieval, Module 4: Feature extraction, lecture slides, Utrecht University. Available:
+  \url{https://webspace.science.uu.nl/~telea001/MR/Slides}.
 \end{description}
 
 \end{document}
