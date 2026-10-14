@@ -957,6 +957,308 @@ and uses the same barycenter, so the two steps give the same result as running a
 limitation is the group of 142 shapes with unclear axes, whose rotation around one axis is random. This does not matter for rotation-invariant features such as the
 distributions A3 and D1--D4, but it has to be kept in mind for features that depend on the orientation.
 
+\subsection{Step 3.2: Shape Descriptors}
+\label{sec:descriptors}
+
+\subsubsection{Aim}
+
+After completing the full normalization in Step 3.1, the next step was to describe the geometry of each shape using numerical features. The goal was to represent the shapes in a form that can later be used to compare a query shape with the database.
+
+Two types of descriptors were calculated: global descriptors and distribution-based descriptors. Global descriptors summarize properties such as surface area, compactness, diameter, and eccentricity. Distribution-based descriptors represent geometric measurements as histograms. Together, they provide numerical features for the later retrieval stage.
+
+The implementation was run on all 2,483 normalized shapes.
+
+\subsubsection{Global Descriptors}
+
+Six global descriptors were calculated to capture different properties of the shapes.
+
+\paragraph{Surface area.}
+Surface area is the sum of the areas of all triangular faces in a mesh:
+
+\begin{equation}
+A(M) = \sum_{f \in F} A(f).
+\label{eq:s32_surface_area}
+\end{equation}
+
+Here, $F$ is the set of faces and $A(f)$ is the area of face $f$.
+
+\paragraph{Spherical compactness.}
+Spherical compactness measures how closely a shape resembles a sphere. It is calculated using the mesh volume and surface area:
+
+\begin{equation}
+C_s(M) = \frac{36\pi V(M)^2}{A(M)^3}.
+\label{eq:s32_compactness}
+\end{equation}
+
+Here, $V(M)$ is the volume and $A(M)$ is the surface area. A value close to one indicates a shape that is close to spherical. This descriptor requires a reliable volume measurement and may therefore be unavailable for non-watertight meshes.
+
+\paragraph{3D rectangularity.}
+Rectangularity measures the proportion of the oriented bounding box occupied by the shape:
+
+\begin{equation}
+R_3(M) = \frac{V(M)}{V_{\mathrm{OBB}}(M)}.
+\label{eq:s32_rectangularity}
+\end{equation}
+
+Here, $V_{\mathrm{OBB}}(M)$ is the volume of the oriented bounding box. A higher value means the shape occupies a larger proportion of its bounding box.
+
+\paragraph{Diameter.}
+The diameter represents the maximum distance between two points of a shape. In this implementation, it was calculated using the vertices of the convex hull:
+
+\begin{equation}
+D(M) = \max_{p,q \in H(M)} \|p-q\|_2.
+\label{eq:s32_diameter}
+\end{equation}
+
+Here, $H(M)$ is the set of convex hull vertices and $\|\cdot\|_2$ denotes Euclidean distance. The diameter describes the overall extent of the shape.
+
+\paragraph{Convexity.}
+Convexity measures the ratio between the volume of the shape and the volume of its convex hull:
+
+\begin{equation}
+C_v(M) = \frac{V(M)}{V_{\mathrm{hull}}(M)}.
+\label{eq:s32_convexity}
+\end{equation}
+
+A value close to one indicates a convex shape. Shapes with concavities generally have lower values. This descriptor depends on reliable volume calculations.
+
+\paragraph{Eccentricity.}
+Eccentricity describes how the vertices are distributed along the principal directions of the shape. It is calculated from the eigenvalues of the covariance matrix of the vertex coordinates. The eigenvalues are ordered as
+
+\begin{equation}
+\lambda_1 \geq \lambda_2 \geq \lambda_3.
+\label{eq:s32_eigenvalues}
+\end{equation}
+
+The descriptor is defined as
+
+\begin{equation}
+E(M) = \frac{\lambda_1}{\lambda_3}.
+\label{eq:s32_eccentricity}
+\end{equation}
+
+A value close to one indicates a similar spread in all three principal directions. A larger value indicates a more elongated vertex distribution.
+
+\subsubsection{Distribution-Based Descriptors}
+
+Five distribution-based descriptors were calculated: A3, D1, D2, D3, and D4. Each descriptor uses random samples of mesh vertices and summarizes the resulting measurements with a histogram. For every shape, 10,000 samples were generated for each descriptor.
+
+\paragraph{A3: angle between three vertices.}
+A3 measures the angle formed by three randomly selected vertices. For vertices $p_1$, $p_2$, and $p_3$, the angle at $p_2$ is
+
+\begin{equation}
+A_3 =
+\cos^{-1}\left(
+\frac{(p_1-p_2)\cdot(p_3-p_2)}
+{\|p_1-p_2\|_2\|p_3-p_2\|_2}
+\right).
+\label{eq:s32_a3}
+\end{equation}
+
+This descriptor captures information about the angular structure of a shape.
+
+\paragraph{D1: distance from the barycentre.}
+The barycentre is the average position of all vertices:
+
+\begin{equation}
+\bar{p} = \frac{1}{N_V}\sum_{i=1}^{N_V}p_i.
+\label{eq:s32_barycentre}
+\end{equation}
+
+D1 measures the distance between a randomly selected vertex and the barycentre:
+
+\begin{equation}
+D_1 = \|p-\bar{p}\|_2.
+\label{eq:s32_d1}
+\end{equation}
+
+This describes how the vertices are distributed around the centre of the shape.
+
+\paragraph{D2: distance between two vertices.}
+D2 measures the Euclidean distance between two randomly selected vertices:
+
+\begin{equation}
+D_2 = \|p_1-p_2\|_2.
+\label{eq:s32_d2}
+\end{equation}
+
+The resulting distribution captures spatial relationships between pairs of vertices.
+
+\paragraph{D3: square root of triangle area.}
+D3 is based on the area of a triangle formed by three randomly selected vertices:
+
+\begin{equation}
+A_{\triangle} =
+\frac{1}{2}\|(p_2-p_1)\times(p_3-p_1)\|_2.
+\label{eq:s32_triangle_area}
+\end{equation}
+
+The descriptor is the square root of this area:
+
+\begin{equation}
+D_3 = \sqrt{A_{\triangle}}.
+\label{eq:s32_d3}
+\end{equation}
+
+\paragraph{D4: cube root of tetrahedron volume.}
+D4 is based on the volume of a tetrahedron formed by four randomly selected vertices:
+
+\begin{equation}
+V_{\mathrm{tetrahedron}} =
+\frac{1}{6}
+\left|
+(p_2-p_1)\cdot
+\left((p_3-p_1)\times(p_4-p_1)\right)
+\right|.
+\label{eq:s32_tetrahedron_volume}
+\end{equation}
+
+The descriptor is the cube root of this volume:
+
+\begin{equation}
+D_4 = \sqrt[3]{V_{\mathrm{tetrahedron}}}.
+\label{eq:s32_d4}
+\end{equation}
+
+D3 and D4 add information about the areas and volumes formed by sampled vertices.
+
+\subsubsection{Histogram Representation}
+
+Each of the five distribution descriptors was represented by a histogram with 32 bins. The normalized frequency of bin $j$ is
+
+\begin{equation}
+h_j = \frac{n_j}{N_s},
+\label{eq:s32_histogram}
+\end{equation}
+
+where $n_j$ is the number of measurements in the bin and $N_s=10{,}000$ is the number of samples. The normalized frequencies in each histogram sum to approximately one.
+
+The five histograms provide
+
+\begin{equation}
+5 \times 32 = 160
+\label{eq:s32_histogram_count}
+\end{equation}
+
+distribution-based features per shape. Fixed histogram ranges were used to keep the representation consistent across the database. Measurements outside the selected ranges were clipped to the range boundaries before being assigned to bins. This gives a fixed-length representation, although clipping can cause measurements outside the range to accumulate in the first or last bin.
+
+\begin{table}[htbp]
+\centering
+\caption{Configuration used for Step 3.2 feature extraction.}
+\label{tab:s32_config}
+\begin{tabular}{lr}
+\hline
+Parameter & Value \\
+\hline
+Input shapes & 2,483 \\
+Global descriptors & 6 \\
+Distribution descriptors & 5 \\
+Samples per distribution & 10,000 \\
+Bins per histogram & 32 \\
+Histogram features per shape & 160 \\
+Successful extractions & 2,483 \\
+Failed extractions & 0 \\
+\hline
+\end{tabular}
+\end{table}
+
+\subsubsection{Implementation and Results}
+
+The extraction script processed the normalized meshes and saved the results in CSV files. The main feature file was saved as \texttt{report/data/step3/features\_step3\_2.csv}, and the summary file was saved as \texttt{report/data/step3/features\_step3\_2\_summary.csv}.
+
+All 2,483 shapes were processed without an extraction failure. The main CSV file contains 175 columns, including metadata, global descriptors, the 160 histogram features, and processing status information.
+
+\begin{table}[htbp]
+\centering
+\caption{Results of the Step 3.2 feature extraction.}
+\label{tab:s32_results}
+\begin{tabular}{lr}
+\hline
+Measurement & Result \\
+\hline
+Input shapes & 2,483 \\
+Successful extractions & 2,483 \\
+Failed extractions & 0 \\
+Columns in the feature CSV & 175 \\
+Histogram feature columns & 160 \\
+Samples per distribution & 10,000 \\
+Bins per histogram & 32 \\
+Execution time & 302.6 seconds \\
+\hline
+\end{tabular}
+\end{table}
+
+The global descriptors can be visualized using histograms to show how their values vary across the database. The distribution descriptors can be visualized using their average normalized histogram frequencies.
+
+% Uncomment after placing this image in the Images folder.
+% \begin{figure}[htbp]
+% \centering
+% \includegraphics[width=\textwidth]{Images/step3_2_global_descriptors.png}
+% \caption{Distributions of the global shape descriptors across the database. Missing values are excluded from the corresponding plots.}
+% \label{fig:s32_global}
+% \end{figure}
+
+% Uncomment after placing this image in the Images folder.
+% \begin{figure}[htbp]
+% \centering
+% \includegraphics[width=\textwidth]{Images/step3_2_distribution_descriptors.png}
+% \caption{Average normalized histograms for the A3, D1, D2, D3, and D4 descriptors.}
+% \label{fig:s32_distributions}
+% \end{figure}
+
+\subsubsection{Validation Using a Cube and a Sphere}
+
+The implementation was tested using a cube and a triangulated sphere. These shapes were chosen because their geometric properties are well understood.
+
+The cube was watertight, with a surface area of 6 and a volume of 1. Its spherical compactness was approximately 0.524, while its rectangularity and convexity were both 1. Its diameter was approximately 1.732 and its eccentricity was 1.
+
+The triangulated sphere had a measured surface area of approximately 3.127 and a volume of approximately 0.519. Its spherical compactness was approximately 0.997, indicating that it closely resembled a sphere. Its rectangularity was approximately 0.525, convexity was 1, diameter was 1, and eccentricity was approximately 1.
+
+\begin{table}[htbp]
+\centering
+\caption{Global descriptor values obtained during cube and sphere validation.}
+\label{tab:s32_validation}
+\begin{tabular}{lrr}
+\hline
+Descriptor & Cube & Sphere \\
+\hline
+Surface area & 6.000 & 3.127 \\
+Spherical compactness & 0.524 & 0.997 \\
+3D rectangularity & 1.000 & 0.525 \\
+Diameter & 1.732 & 1.000 \\
+Convexity & 1.000 & 1.000 \\
+Eccentricity & 1.000 & 1.000 \\
+Mesh volume & 1.000 & 0.519 \\
+Convex hull volume & 1.000 & 0.519 \\
+\hline
+\end{tabular}
+\end{table}
+
+All five distribution descriptors were also tested on both shapes. Each descriptor generated 10,000 samples and a 32-bin histogram. The normalized frequencies summed to one for every histogram, and the basic validation tests passed.
+
+The results were consistent with the expected behaviour of the descriptors. The sphere had spherical compactness close to one, whereas the cube had a lower value. Both shapes had convexity equal to one because they were convex. These tests provide a basic check of the calculations and histogram generation, but they do not prove that every sampling convention and histogram range is optimal for the full database.
+
+\subsubsection{Missing Values and Limitations}
+
+Although the extraction procedure completed for all shapes, some descriptors could not be calculated for every mesh. A total of 1,971 shapes were non-watertight, while 512 shapes were watertight.
+
+For the non-watertight meshes, the implementation could not reliably calculate volume-dependent descriptors. Consequently, four columns contained missing values: mesh volume, spherical compactness, 3D rectangularity, and convexity. Each of these columns contained 1,971 missing values, giving 7,884 missing values across the four columns.
+
+These values were kept as missing rather than replaced with zero. Replacing them with zero could incorrectly imply that a shape has no volume or no compactness. The processing status indicates that the extraction procedure completed, not that every descriptor was available for every mesh.
+
+This limitation must be considered in subsequent analysis. Statistical summaries and similarity calculations involving these descriptors should handle missing values explicitly rather than treating them as genuine zeros.
+
+Another limitation is that the distribution descriptors were calculated using randomly selected mesh vertices. The sampling therefore reflects the distribution of vertices rather than necessarily providing uniform sampling over the surface area. The fixed histogram ranges also require careful selection because clipping may reduce the ability to distinguish measurements outside those ranges.
+
+\subsubsection{Conclusion}
+
+Step 3.2 extended the normalized shape database by computing six global descriptors and five distribution-based descriptors. The global descriptors summarize the overall geometry of each mesh, while the distribution descriptors provide fixed-length histograms describing angular, distance, triangle-area, and tetrahedron-volume properties.
+
+The implementation successfully processed all 2,483 shapes and generated 160 histogram features per shape. Validation using a cube and a sphere produced reasonable results, and all five histograms were generated with 10,000 samples and 32 bins.
+
+The main limitation was the presence of non-watertight meshes, for which volume-dependent descriptors were unavailable. These missing values were preserved and documented rather than silently replaced with zero. Overall, Step 3.2 provides a numerical representation of the shape database for subsequent comparison and retrieval, provided that missing values and histogram limitations are handled appropriately.
+
+
 \clearpage
 \section*{References}
 \addcontentsline{toc}{section}{References}

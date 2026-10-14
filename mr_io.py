@@ -12,7 +12,7 @@ import trimesh
 # The project folder holds Data/, processed/ and report/. The code is normally in its src/ folder;
 # if the .py files lie directly in the project folder, that folder is used instead.
 _HERE = Path(__file__).resolve().parent
-PROJECT_ROOT = _HERE.parent if _HERE.name == "src" else _HERE
+PROJECT_ROOT = _HERE.parent if _HERE.name in ("src", "Multimedia-Retrieval-Assignment") else _HERE
 DATA_DIR = PROJECT_ROOT / "Data"
 
 
