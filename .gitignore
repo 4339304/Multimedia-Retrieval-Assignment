@@ -2,7 +2,12 @@
 Data/*
 !Data/PUT_THE_SHAPE_DATABASE_HERE.txt
 processed/
-report/data/
+report/data/*
+!report/data/step3/
+report/data/step3/*
+!report/data/step3/features_step3_2.csv
+!report/data/step3/features_step3_2_summary.csv
+!report/data/step3/step3_2_validation.txt
 
 # Python
 __pycache__/
