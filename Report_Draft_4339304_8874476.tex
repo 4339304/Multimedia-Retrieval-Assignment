@@ -116,7 +116,8 @@ and prepared before they can be compared.
 \subsection{Structure of the Report}
 Section~\ref{sec:step1} describes how the shapes are read from disk and visualized, and Section~\ref{sec:step2} describes
 the analysis and preprocessing of the shape database. Section~\ref{sec:step3} covers the feature extraction: the full normalization of the shapes
-(Step~3.1) and the computation of the shape descriptors (Step~3.2). Section~\ref{sec:intro} also introduces the
+(Step~3.1) and the computation of the shape descriptors (Step~3.2). Section~\ref{sec:step4} describes how the features are
+normalized and compared to answer queries. Section~\ref{sec:intro} also introduces the
 mathematical notation (Section~\ref{sec:notation}) and the software that was used (Section~\ref{sec:tools}).
 
 \subsection{Mathematical Notation}\label{sec:notation}
@@ -199,6 +200,12 @@ $H(M)$ & vertices of the convex hull & \ref{sec:descriptors}\\
 A3, D1, D2, D3, D4 & distribution descriptors (angle, distances, triangle area, tetrahedron volume) & \ref{sec:descriptors}\\
 $N_s$, $B$, $h_j$ & samples per descriptor, number of bins, share of the values in bin $j$ & \ref{sec:descriptors}\\
 $[r_{\min},r_{\max}]$ & range of a histogram & \ref{sec:descriptors}\\
+$\mathcal{G}$, $\varphi_g(M)$, $\hat\varphi_g(M)$ & set of descriptors, feature values of descriptor $g$ before and after normalization & \ref{sec:s4norm}\\
+$\varphi_g^{\min}$, $\varphi_g^{\max}$, $\mu_g$, $\sigma_g$ & smallest and largest value, mean and standard deviation of descriptor $g$ over the database & \ref{sec:s4norm}\\
+$d_g(M_1,M_2)$, $\rho_g$ & distance of two shapes for descriptor $g$, standard deviation of $d_g$ over pairs of database shapes & \ref{sec:s4dist}\\
+$\mathcal{G}_{12}$, $D(M_1,M_2)$ & descriptors available for both shapes, distance between two shapes & \ref{sec:s4dist}\\
+$M_q$, $K$ & query shape, number of returned shapes & \ref{sec:s4compare}\\
+$TP$, $FP$, PPV & returned shapes with and without the class of the query, precision & \ref{sec:s4compare}\\
 \bottomrule\end{tabular}
 \caption{Notation used in this report.}\label{tab:notation}
 \end{table}
@@ -979,8 +986,8 @@ barycenter $\bar v$ as the reference point~[16]:
 The slides take the absolute value of this sum~[16]. Here the sign is kept: after Step~2 the normals point outwards, so a negative
 volume means that the faces of the shape point inwards, and such a volume is not used (see below).
 This formula is only exact for a closed mesh with consistent normals. Step~2 made the normals consistent for all but 63
-shapes, but only 507 of the 2,483 shapes are closed in the strict sense that every edge belongs to exactly two triangles. (The
-572 shapes of Section~\ref{sec:normalization} were counted with a looser rule that also accepts parts that are almost closed.) For a mesh with a hole, the formula misses the cone between the hole
+shapes. But only 507 of the 2,483 shapes are closed, which here means that every edge belongs to exactly two triangles.
+Section~\ref{sec:normalization} counted 572 closed shapes, because it also accepts parts that are almost closed. For a mesh with a hole, the formula misses the cone between the hole
 and $\bar v$~[17]. The holes are therefore filled first, as proposed in the technical tips~[17]: the boundary edges are
 followed to closed loops, and every loop is closed with a fan of triangles around the mean of its vertices. For a hole whose
 boundary vertices are $w_1,\ldots,w_m$, in the order in which the faces next to the hole list them, the added triangles are
@@ -1025,7 +1032,7 @@ C(M) = \frac{A_c(M)^3}{36\pi\,\mathrm{Vol}(M)^2},
 \end{equation}
 which is 1 for a sphere and larger for every other shape. Here $A_c(M)$ is the area of the closed surface that encloses the
 volume, so the surface with the filled holes. Using the area of the open mesh together with the volume of the filled mesh would
-mix two different surfaces: for an open shelf with an area of 0.66 and a filled area of 2.02, it gave a value that is more
+mix two different surfaces. For an open shelf with an area of 0.66 and a filled area of 2.02, this gave a value that is more
 compact than a sphere. The compactness grows without limit for flat shapes, where the volume is close to zero; the largest value in
 the database is $6.3\cdot10^{9}$. The feature table therefore also stores the sphericity $S(M)=1/C(M)$, which the slides give as the same
 measure on a different scale~[16]. It lies in $(0,1]$, which is easier to use for the comparison of shapes in Step~4.
@@ -1174,16 +1181,16 @@ The table has 117 columns: the class and file name, the numbers of vertices and 
 compactness, sphericity, rectangularity, diameter, convexity and eccentricity), the volume with how it was obtained, the number
 of filled holes, the volumes of the convex hull and of the bounding box, the 100 histogram values and a status column. The
 volume-based values are empty for the 156 shapes with a rejected volume (6.3\,\% of the database). Every class
-has values for at least 63\,\% of its shapes. The empty values are kept empty instead of being set to zero, because
-a zero would be a real, wrong value; Step~4 has to handle them.
+has values for at least 63\,\% of its shapes. The empty values are kept empty instead of being set to zero, because a zero would be a real, wrong value; Step~4 leaves
+them out of the distance (Section~\ref{sec:s4dist}).
 
 As asked in the assignment, the features of a single shape can also be shown:
 \begin{center}
 \texttt{python run\_s3\_2.py -{}-shape processed/step3\_normalized/Mug/D00685.obj}
 \end{center}
 prints the global descriptors and the five histograms. If the shape is in the feature table, the values are read from it;
-otherwise they are computed. A new shape has to be resampled and normalized first (Steps 2 and 3.1); this chain is added for
-the query shapes of Step~4.
+otherwise they are computed. A new shape has to be resampled and normalized first (Steps 2 and 3.1); this chain is described in
+Section~\ref{sec:s4query}.
 
 \subsubsection{Validation on Simple Shapes}
 
@@ -1225,7 +1232,8 @@ descriptors only shapes with a closed or filled mesh. Figure~\ref{fig:s32_demo} 
 \end{figure}
 
 The values agree with how the shapes look. The fan-shaped plant, made of thin flat leaves, has
-almost no volume for its large surface and gets a sphericity close to zero, while the bottle is rounder than 97\,\% of the shapes with a closed or filled mesh.
+almost no volume for its large surface and gets a sphericity close to zero. The bottle is rounder than 97\,\% of the shapes
+with a closed or filled mesh.
 The tree fills only 0.5\,\% of its bounding box, while the computer, made of boxes, fills about half of it. The glasses have a
 convexity of 0.012, because their convex hull includes all the empty space between the frame and the legs, while the head is
 almost convex (0.90). The house, which is about as deep as it is wide, has an eccentricity of 1.6, and the gun, which is long and
@@ -1274,18 +1282,18 @@ shapes will be hard to find with a query on another mug.
 The biggest weak point is still the volume. For 1,243 shapes the mesh could not be closed, so their volume is only an estimate.
 The values that are clearly impossible are removed, but a volume that is wrong and still possible stays in the table. The 63 shapes
 that kept orientation conflicts after Step~2 can also get a wrong volume, because some of their tetrahedra are subtracted
-instead of added~[17]. The hole filling has its own limit: a fan of triangles is a good guess for a small, flat hole, but for a
-large opening, such as the open front of a shelf, it is only a rough guess of what the closed shape would look like~[17].
+instead of added~[17]. The hole filling has its own limit. A fan of triangles is a good guess for a small, flat hole, but for a
+large opening, such as the open front of a shelf, it is only a rough guess of the closed shape~[17].
 
 The distributions are computed from vertices, as the assignment asks, and not from points spread evenly over the surface. After
 Step~2 the vertices are spread fairly evenly (Section~\ref{sec:step2}), but parts with smaller triangles still get more samples
 than other parts of the same size.
 
 Compactness and eccentricity have very long tails, with a few shapes having values thousands of times larger than the median.
-This has to be taken into account when the features are normalized in Step~4.
+Step~4 therefore uses the logarithm of these values (Section~\ref{sec:s4norm}).
 
 Finally, it turned out that some shapes are in the database twice. 230 pairs of shapes have almost the same histograms (an
-average difference below 0.02), and the pairs that were checked turned out to be the same model, with the same number of faces in the original
+average difference below 0.02), and the pairs that were checked are the same model, with the same number of faces in the original
 file and the same surface area. In 19 of these pairs the two copies are in different classes; for example, the same airship is
 both in AircraftBuoyant and in Rocket. These copies can make some queries in Step~4 look better than they really are, and the
 copies with two labels can count as errors in the evaluation.
@@ -1296,6 +1304,166 @@ Step 3.2 describes every shape with seven global values and five histograms of 2
 and checking every volume, the volume-based descriptors are available for 93.7\,\% of the shapes instead of only the closed
 ones. The descriptors gave the exact values on simple test shapes and values that match the look of the shapes in the database,
 and the histograms of one class are mostly similar. The feature table is the input for the querying in Step~4.
+
+% =============================================================================================
+\section{Step 4: Querying}\label{sec:step4}
+% =============================================================================================
+
+\subsection{Aim}
+In this step the descriptors of Step~3 are used to answer queries: for a query shape, the system computes its features, compares
+them with the features of all database shapes and returns the closest shapes. The assignment asks to first bring the features to
+a common range, then to compare them with a distance function, starting with the Euclidean distance, and to present the best
+matches with their distances~[1].
+
+\subsection{Normalization of the Features}\label{sec:s4norm}
+Every shape $M$ is described by the descriptors $\mathcal{G}$ of Step~3.2: six global descriptors and the five histograms A3,
+D1, D2, D3 and D4, so $\card{\mathcal{G}}=11$ descriptors with 106 values. The values of descriptor $g$ are written as
+$\varphi_g(M)$: one number for a global descriptor and 20 values for a histogram. Of compactness and sphericity, only the
+sphericity $S(M)$ is used, because the compactness reaches $6.3\cdot10^{9}$ while the sphericity lies between 0 and 1.
+
+The global descriptors have very different ranges, from 1--1.6 for the diameter to 1--75,000 for the eccentricity, so without a
+normalization the descriptors with large values would decide the distance alone~[18]. The assignment asks to consider min-max
+normalization and standardization~[1]:
+\begin{equation}
+\hat\varphi_g(M)=\frac{\varphi_g(M)-\varphi_g^{\min}}{\varphi_g^{\max}-\varphi_g^{\min}}
+\qquad\text{and}\qquad
+\hat\varphi_g(M)=\frac{\varphi_g(M)-\mu_g}{\sigma_g},
+\label{eq:s4norm}
+\end{equation}
+where $\varphi_g^{\min}$, $\varphi_g^{\max}$, $\mu_g$ and $\sigma_g$ are the smallest and largest value, the mean and the
+standard deviation of the descriptor over the database. Min-max normalization depends on the two most extreme shapes: for the
+eccentricity, 90\,\% of the shapes end up in an interval of only 0.006. Standardization is less sensitive to outliers and is the
+method recommended in the slides and the technical tips~[18,19], so it is used here. The histograms are not changed, because they
+already sum to one, which is the normalization recommended for histograms~[18,19].
+
+Five of the six global descriptors cover several orders of magnitude: besides the eccentricity, the surface area goes from 0.04 to
+15, and the sphericity, rectangularity and convexity of flat shapes go down to between $10^{-10}$ and $10^{-5}$. For these five,
+$\log_{10}\varphi_g(M)$ is standardized instead of the value itself, so that ratios count instead of absolute differences; the
+diameter is standardized directly. Figure~\ref{fig:s4norm} shows the effect and Table~\ref{tab:s4params} the parameters. The
+parameters are computed once on the database and saved, together with the normalized feature table
+(\path{report/data/step4/features_normalized.csv}), which can be inspected with \texttt{python run\_step4.py -{}-show}. A query
+shape is always normalized with these saved parameters.
+
+\begin{figure}[!htbp]\centering
+\includegraphics[width=\linewidth]{s4_normalization.png}
+\caption{Global descriptors of the 2,473 database shapes before (top) and after (bottom) the normalization. All descriptors
+except the diameter are standardized after taking the logarithm.}
+\label{fig:s4norm}
+\end{figure}
+
+\begin{table}[htbp]\centering\small
+\begin{tabular}{@{}lcrrr@{}}\toprule
+Descriptor $g$ & logarithm & $\mu_g$ & $\sigma_g$ & $\rho_g$\\\midrule
+surface area & yes & 0.065 & 0.394 & 0.851\\
+sphericity & yes & $-1.966$ & 1.011 & 0.931\\
+rectangularity & yes & $-1.033$ & 0.570 & 0.912\\
+diameter & no & 1.060 & 0.087 & 1.075\\
+convexity & yes & $-0.695$ & 0.516 & 0.940\\
+eccentricity & yes & 1.283 & 0.707 & 0.879\\
+A3, D1, D2, D3, D4 & -- & -- & -- & 0.092, 0.135, 0.090, 0.154, 0.212\\
+\bottomrule\end{tabular}
+\caption{Normalization parameters of the database: mean $\mu_g$ and standard deviation $\sigma_g$ of every global descriptor
+(of its logarithm where indicated) and the spread $\rho_g$ of the descriptor distances (Section~\ref{sec:s4dist}).}
+\label{tab:s4params}
+\end{table}
+
+\subsection{Query Shapes}\label{sec:s4query}
+A query can be a database shape or a mesh file from outside the database. As suggested in the assignment~[1], ten shapes were taken
+out of the database to serve as outside queries: one random shape of each of the classes Bicycle, Bird, Car, Chess, Guitar,
+Humanoid, Jet, Mug, Sword and Tree, so the database for the queries has 2,473 shapes. Shapes that are stored twice in the database
+(Section~\ref{sec:descriptors}) were not chosen, because their copy would be found as a perfect match. A query mesh is processed
+exactly like the database: cleaning, reorientation and resampling (Section~\ref{sec:resampling}), the normalization of
+Sections~\ref{sec:s25} and~\ref{sec:normalization}, and the descriptors of Section~\ref{sec:descriptors}, which takes 1 to 4
+seconds. To check this chain, it was run on the original files of the ten query shapes and three other shapes. All features agree
+with the stored ones up to rounding: the largest difference is $1.2\cdot10^{-5}$, and only one compactness value of about 2,073
+differs in the sixth digit.
+
+\subsection{Euclidean Distance}\label{sec:s4dist}
+The plain Euclidean distance between the full feature vectors gives the descriptors very different influence, because the 100
+histogram values and the six global values differ in number and in their typical differences. As proposed in the technical
+tips~[19], the distances of the single descriptors are therefore weighted. For two shapes $M_1$ and $M_2$, the distance for
+descriptor $g$ is
+\begin{equation}
+d_g(M_1,M_2)=\big\lVert\hat\varphi_g(M_1)-\hat\varphi_g(M_2)\big\rVert,
+\label{eq:s4dg}
+\end{equation}
+the absolute difference for a global descriptor and the Euclidean distance between the two histograms otherwise. With $\rho_g$
+the standard deviation of $d_g$ over 200,000 random pairs of database shapes (Table~\ref{tab:s4params}), the distance is
+\begin{equation}
+D(M_1,M_2)=\sqrt{\frac{\card{\mathcal{G}}}{\card{\mathcal{G}_{12}}}\sum_{g\in\mathcal{G}_{12}}\left(\frac{d_g(M_1,M_2)}{\rho_g}\right)^2},
+\label{eq:s4D}
+\end{equation}
+where $\mathcal{G}_{12}\subseteq\mathcal{G}$ are the descriptors available for both shapes. Without missing values, $D$ is the
+Euclidean distance between the feature vectors after every descriptor has been divided by $\rho_g$. The 156 shapes with missing
+volume-based descriptors are compared only on the descriptors they have, and the factor $\card{\mathcal{G}}/\card{\mathcal{G}_{12}}$
+keeps them from looking closer because fewer terms are added. For a query, $D$ is computed to all database shapes and sorted, and
+the $K$ closest shapes are returned with their distance, in 0.07 seconds per query. The histogram distance in
+Eq.~\eqref{eq:s4dg} is a parameter of the program, so that other distance functions can be used later.
+
+\subsection{Choice of the Options}\label{sec:s4compare}
+The options were compared by using every database shape once as a query for all other shapes. For every query, the precision
+of the $K=10$ closest shapes was computed as defined in the lecture slides~[20],
+\begin{equation}
+\mathrm{PPV}=\frac{TP}{TP+FP}=\frac{TP}{K},
+\label{eq:s4ppv}
+\end{equation}
+where $TP$ is the number of returned shapes with the class of the query $M_q$ and $FP$ the number of the others, and it was
+averaged over all queries. Table~\ref{tab:s4options} shows the result. The evaluation of the final system is the subject of a later step.
+
+\begin{table}[htbp]\centering\small
+\begin{tabular}{@{}lr@{}}\toprule
+Option & PPV ($K=10$)\\\midrule
+one vector, min-max normalization & 0.281\\
+one vector, standardization & 0.274\\
+one vector, standardization with logarithm & 0.307\\
+only the five histograms & 0.217\\
+weighted descriptors, no logarithm & 0.290\\
+weighted descriptors, logarithm only for surface area and eccentricity & 0.312\\
+\textbf{weighted descriptors, logarithm, missing values left out (used)} & \textbf{0.319}\\
+weighted descriptors, logarithm, min-max normalization & 0.319\\
+weighted descriptors, logarithm, missing values replaced by the mean & 0.322\\\midrule
+random order & 0.021\\
+\bottomrule\end{tabular}
+\caption{Precision of the ten closest shapes, averaged over all 2,473 database shapes as queries. ``One vector'' is the plain
+Euclidean distance between the full feature vectors; ``weighted descriptors'' is Eq.~\eqref{eq:s4D}.}
+\label{tab:s4options}
+\end{table}
+
+The logarithm and the weighting both improve the result, and the global descriptors add a lot compared with the histograms alone.
+With the weights, min-max normalization and standardization give the same result, because dividing by $\rho_g$ cancels any linear
+change of a descriptor. Replacing missing values by the mean is 0.002 better overall, but for the 156 shapes with missing values
+themselves it gives 0.178 instead of 0.214, because the mean makes them look like an average shape. The missing values are
+therefore left out. All options are far better than a random order, but on average only about three of the ten closest shapes have
+the right class.
+
+\subsection{Query Results}\label{sec:s4results}
+Figure~\ref{fig:s4queries} shows the ten outside queries with their five closest shapes; 20 of the 50 results have the class of
+the query. The Humanoid gets five correct shapes and the Bicycle, Jet and Sword four, because the shapes of these classes are similar to
+each other and different from most other shapes. The Bird, Car, Chess and Tree get none; for most of them the figure shows why. The Chess query is a flat chess
+board and is matched with other flat shapes such as a shelf, signs and tables. The Tree is a thin trunk with a few leaves and is
+matched with spoons, and the Car with long, low shapes such as motorcycles. The Mug finds two mugs and two vases with a similar
+round body, and the closest shape to the Guitar is a guitar labeled Musical\_Instrument, so this mistake comes from the class
+labels. In these cases the descriptors capture the overall form, but not the details that decide the class. Some results appear
+twice with almost the same distance, such as the two computers for the Bird (1.351 and 1.353); these are duplicated shapes of the
+database.
+
+\begin{figure}[!htbp]\centering
+\includegraphics[width=0.92\linewidth]{s4_queries.png}
+\caption{The ten query shapes from outside the database (left, blue) with their five closest database shapes and the distance
+$D$. Green: same class as the query, red: another class. Shapes are shown in their normalized pose; for nearly balanced
+shapes, such as one bicycle and one motorcycle, the moment test chooses the direction by a very small margin, so they appear
+upside down (Section~\ref{sec:normalization}).}
+\label{fig:s4queries}
+\end{figure}
+
+\subsection{Discussion and Conclusion}
+The global descriptors are standardized after taking the logarithm of all of them except the diameter, and the normalized feature
+table is stored. A query shape from outside the database is processed like the database and gives the same features. The weighted
+Euclidean distance performed best of the tested options and answers a query in 0.07 seconds. Its main weakness is that histograms
+are compared bin by bin, so two similar histograms that are shifted by one bin count as different; this is one reason why the
+histograms alone give a low precision. In addition, all descriptors get the same weight although some separate the classes
+better than others, and the volume-based descriptors are only estimates for many shapes. The duplicated shapes make the values of
+Table~\ref{tab:s4options} slightly too high.
 
 \clearpage
 \section*{References}
@@ -1333,6 +1501,12 @@ and the histograms of one class are mostly similar. The feature table is the inp
   \url{https://webspace.science.uu.nl/~telea001/MR/Slides}.
 \item[{[17]}] A. C. Telea, Multimedia Retrieval, Technical tips: Step 3 (parts 1--3), Utrecht University. Available:
   \url{https://webspace.science.uu.nl/~telea001/MR/TechnicalTips}.
+\item[{[18]}] A. C. Telea, Multimedia Retrieval, Module 5: Matching, lecture slides, Utrecht University. Available:
+  \url{https://webspace.science.uu.nl/~telea001/MR/Slides}.
+\item[{[19]}] A. C. Telea, Multimedia Retrieval, Technical tips: Step 4, Utrecht University. Available:
+  \url{https://webspace.science.uu.nl/~telea001/MR/TechnicalTips}.
+\item[{[20]}] A. C. Telea, Multimedia Retrieval, Module 7: Evaluation, lecture slides, Utrecht University. Available:
+  \url{https://webspace.science.uu.nl/~telea001/MR/Slides}.
 \end{description}
 
 \end{document}
