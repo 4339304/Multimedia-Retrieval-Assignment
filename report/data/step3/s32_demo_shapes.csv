@@ -1,0 +1,13 @@
+descriptor,end,class,file,value
+sphericity,low,PlantWildNonTree,m985.obj,0.0001746196496576
+sphericity,high,Bottle,m492.obj,0.4058916589484308
+3D rectangularity,low,Tree,D00727.obj,0.0052758193546391
+3D rectangularity,high,Computer,D01085.obj,0.5213506021627103
+convexity,low,Glasses,D00816.obj,0.0121675430513792
+convexity,high,HumanHead,m350.obj,0.9003627495834464
+eccentricity,low,House,m461.obj,1.5764215734466065
+eccentricity,high,Gun,m677.obj,712.23519664398
+diameter,low,Jet,m1293.obj,1.000017527689694
+diameter,high,Shelf,D00818.obj,1.2932271907475572
+surface area,low,Jet,m1276.obj,0.2015075670822336
+surface area,high,Wheel,m741.obj,5.841958612852784
