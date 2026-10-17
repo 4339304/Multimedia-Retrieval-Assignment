@@ -1,6 +1,6 @@
 """Figures for Step 3.1 (report/figures/step3/).
 
-    python src/figures_step3_1.py
+    python figures_step3_1.py
 
 1. before/after renders of a few shapes, with the coordinate axes drawn at the origin
 2. histograms of the normalization measures before and after, over the whole database
@@ -93,7 +93,7 @@ def histograms():
             a.set_xscale("log")
         a.tick_params(labelsize=8)
 
-    pair(ax[0], d.bary_dist_before, d.bary_dist_after, np.logspace(-11, 9, 41),
+    pair(ax[0], d.bary_dist_before, d.bary_dist_after, np.logspace(-15, 9, 49),
          "(a) translation", r"$\|\bar v\|$: distance of the barycenter to the origin", logx=True)
     pair(ax[1], d.angle_e1_before, d.angle_e1_after, np.linspace(0, 90, 19),
          "(b) alignment", r"angle between $e_1$ and the $x$ axis (deg)")
