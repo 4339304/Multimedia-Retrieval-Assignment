@@ -1,4 +1,4 @@
-Multimedia Retrieval assignment - code for Steps 1 to 3
+Multimedia Retrieval assignment - code for Steps 1 to 4
 ========================================================
 
 1. Put the shape database in the folder Data/ next to the .py files
@@ -14,13 +14,13 @@ Multimedia Retrieval assignment - code for Steps 1 to 3
    The Plotly viewer and the database-wide load test are in step1_read_and_view.ipynb.
 
 4. Step 2 - analysis, resampling, checking and normalization (run in this order):
-       python run_step2.py --force        2.1-2.3: statistics and resampling (about 8 minutes)
+       python run_step2.py --force        2.1-2.3: statistics and resampling (about 7 minutes)
        python check_resampling.py         2.4: check of the resampled database (about 3 minutes)
        python normalize_shapes.py         2.5: centering and scaling (about 8 minutes)
    Figures and statistics for the report: step2_preprocessing.ipynb
 
 5. Step 3.1 - full normalization (alignment and flipping), needs the output of 2.5:
-       python run_step3_1.py --force      (about 6 minutes)
+       python run_step3_1.py --force      (about 4 minutes)
        python figures_step3_1.py          figures for the report
 
 6. Step 3.2 - shape descriptors, needs the output of 3.1 (8 GB memory is enough):
@@ -32,10 +32,22 @@ Multimedia Retrieval assignment - code for Steps 1 to 3
        python figures_step3_2.py --ranges --bins
                                           histogram ranges and choice of the number of bins (about 8 minutes)
 
+7. Step 4 - querying (normalization and Euclidean distance), needs the feature table of 3.2:
+       python run_step4.py --build        normalize the features; 10 query shapes are taken out of the database
+       python run_step4.py --show         print the normalized feature table
+       python run_step4.py --query Data/Mug/D00172.obj -k 5
+                                          query with any OBJ file (processed like the database)
+       python run_step4.py --query Mug/D00685.obj -k 5
+                                          query with a shape of the database (class/file)
+       python run_step4.py --compare      compare the normalization and weighting options (about 1 minute)
+       python figures_step4.py            figures for the report
+
 Results:
-   processed/step2_full/          resampled shapes (Step 2.3)
-   processed/step2_normalized/    centered and scaled shapes (Step 2.5)
-   processed/step3_normalized/    fully normalized shapes (Step 3.1, input for Step 3.2)
-   report/data/step3/features_step3_2.csv   feature table (Step 3.2, one row per shape)
-   report/data/                   statistics (csv)
-   report/figures/                figures (copied to Images/ for the report)
+   processed/step2_full/                        resampled shapes (Step 2.3)
+   processed/step2_normalized/                  centered and scaled shapes (Step 2.5)
+   processed/step3_normalized/                  fully normalized shapes (Step 3.1, input for Step 3.2)
+   report/data/step3/features_step3_2.csv       feature table (Step 3.2, one row per shape)
+   report/data/step4/features_normalized.csv    normalized feature table of the database (Step 4)
+   report/data/step4/query_shapes.csv           shapes taken out of the database to be used as queries (Step 4)
+   report/data/                                 other statistics (csv)
+   report/figures/                              figures (copied to Images/ for the report)
