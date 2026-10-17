@@ -1,4 +1,4 @@
-"""Shared I/O + rendering helpers
+"""Shared I/O + rendering helpers (Step 2 onward).
 
 load_mesh / the Plotly viewer are copied from the Step 1 notebook so Step 1 stays untouched.
 read_obj_raw parses the OBJ text directly so the *original* face sizes (tri/quad/n-gon) are kept,
@@ -9,10 +9,10 @@ from pathlib import Path
 import numpy as np
 import trimesh
 
-# The project folder holds Data/, processed/ and report/. The code is normally in its src/ folder;
-# if the .py files lie directly in the project folder, that folder is used instead.
+# The project folder holds Data/, processed/ and report/. It is the folder of the .py files if Data/
+# lies next to them, else the folder above (code in a src/ or repository sub-folder).
 _HERE = Path(__file__).resolve().parent
-PROJECT_ROOT = _HERE.parent if _HERE.name in ("src", "Multimedia-Retrieval-Assignment") else _HERE
+PROJECT_ROOT = _HERE if (_HERE / "Data").is_dir() or not (_HERE.parent / "Data").is_dir() else _HERE.parent
 DATA_DIR = PROJECT_ROOT / "Data"
 
 
