@@ -32,7 +32,9 @@ from mr_normalize import STEP3_DIR, normalize
 from mr_resample import clean_mesh, fix_orientation, resample_mesh
 from run_s3_2 import FEATURES_CSV, NAMES, features_of
 
+PROJECT_ROOT = Path(__file__).resolve().parent
 OUT = PROJECT_ROOT / "report" / "data" / "step4"
+FEATURES_CSV = PROJECT_ROOT / "report" / "data" / "step3" / "features_step3_2.csv"
 NORM_CSV = OUT / "features_normalized.csv"
 PARAMS_CSV = OUT / "normalization_params.csv"
 QUERY_CSV = OUT / "query_shapes.csv"

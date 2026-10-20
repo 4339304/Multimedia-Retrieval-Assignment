@@ -1465,6 +1465,151 @@ histograms alone give a low precision. In addition, all descriptors get the same
 better than others, and the volume-based descriptors are only estimates for many shapes. The duplicated shapes make the values of
 Table~\ref{tab:s4options} slightly too high.
 
+\section{Normalization and Shape Retrieval}
+\label{sec:step4}
+
+\subsection{Aim}
+
+The aim of this step was to prepare the shape features for retrieval and to examine how different normalization methods and feature combinations affect the quality of the results. The feature values extracted in the previous step do not all have the same scale. For example, surface area can have much larger numerical values than sphericity. If the features are used directly, features with larger values may have too much influence on the distance calculation. Normalization helps reduce this problem and makes the feature values more comparable.
+In addition to normalization, this step compares several feature configurations and distance measures. The goal is to identify which settings return shapes that are more similar to a given query shape.
+
+\subsection{Design and Implementation}
+
+\subsubsection{Preparing the database and query shapes}
+
+The feature table produced in Step 3 was used as the input for this step. It contains the global shape descriptors used for retrieval: surface area, sphericity, 3D rectangularity, diameter, convexity, and eccentricity.
+Ten shapes were held out as queries for evaluation. The remaining shapes formed the retrieval database. Keeping the query shapes separate from the database means that each query can be used to test whether the system retrieves other shapes from the same class. The evaluation therefore measures retrieval performance on shapes that were not included in the database as query examples.
+
+\subsubsection{Feature normalization}
+
+Several normalization and feature-handling configurations were compared. These included min--max normalization, standardization, applying a logarithm to selected feature values, using histogram features alone, and combining weighted descriptors. The comparison also included a configuration in which missing values were replaced by the mean.
+The purpose of these experiments was to check whether the way features are scaled and combined changes the retrieval results. Logarithmic transformation can reduce the influence of features with a wide range of values, while weighting allows selected descriptors to contribute more strongly to the final distance. Missing values were also considered because some descriptors in the original feature table were unavailable for certain shapes.
+
+\subsubsection{Distance calculation and retrieval}
+
+For a query shape, the system compares its feature representation with the feature representations of shapes in the database. It then calculates a distance and ranks the database shapes from the smallest distance to the largest. Shapes with smaller distances are treated as more similar to the query under the selected representation and distance measure.
+The top-ranked shapes are returned as the retrieval results. The implementation saves the normalized features, normalization parameters, query information, and comparison results in the Step 4 output folder. This makes it possible to inspect the results and repeat the comparison without manually recreating the calculations.
+
+\subsection{Experimental Evaluation}
+
+\subsubsection{Comparison of feature configurations}
+
+The configurations were compared using precision at 10. Precision@10 is the proportion of the ten retrieved shapes that belong to the same class as the query. A higher value indicates that more of the top ten results are relevant to the query.
+Table~\ref{tab:step4-options} presents the results reported by the Step 4 comparison script.
+
+\begin{table}[htbp]
+    \centering
+    \small
+    \caption{Precision@10 for the tested feature configurations.}
+    \label{tab:step4-options}
+    \begin{tabular}{p{0.76\linewidth}r}
+        \hline
+        \textbf{Configuration} & \textbf{Precision@10} \\
+        \hline
+        One vector, min--max, no log & 0.2813 \\
+        One vector, standardized, no log & 0.2740 \\
+        One vector, standardized, log & 0.3070 \\
+        Histograms only & 0.2169 \\
+        Weighted descriptors, standardized, log & 0.3192 \\
+        Weighted descriptors, min--max, log & 0.3192 \\
+        Weighted descriptors, missing values set to the mean & 0.3217 \\
+        Weighted descriptors, standardized, no log & 0.2900 \\
+        Weighted descriptors, log of surface area and eccentricity only & 0.3122 \\
+        Random order (expected value) & 0.0206 \\
+        \hline
+    \end{tabular}
+\end{table}
+
+The results show that the tested configurations did not perform equally. The highest Precision@10 was 0.3217, obtained when weighted descriptors were used and missing values were replaced by the mean. The two weighted-descriptor configurations using logarithmic transformation both reached 0.3192. In comparison, using histogram features alone reached 0.2169, which was the lowest score among the non-random configurations.
+The random-order expected value was 0.0206. The tested configurations scored above this baseline, suggesting that the feature-based retrieval system performed better than random ranking on this evaluation. However, the differences between the strongest configurations are small, so the results do not establish that one configuration will always be best for every query or dataset.
+
+\subsubsection{Comparison of distance measures}
+A separate evaluation compared cosine distance and Earth Mover's Distance (EMD) using the ten held-out query shapes. The average precision values are shown in Table~\ref{tab:step4-metrics}.
+
+\begin{table}[htbp]
+    \centering
+    \small
+    \caption{Mean precision for cosine distance and EMD across ten queries.}
+    \label{tab:step4-metrics}
+    \begin{tabular}{lrrr}
+        \hline
+        \textbf{Distance measure} & \textbf{k} & \textbf{Mean precision@k} & \textbf{Standard deviation} \\
+        \hline
+        Cosine & 5 & 0.36 & 0.3239 \\
+        Cosine & 10 & 0.36 & 0.3169 \\
+        EMD & 5 & 0.42 & 0.3458 \\
+        EMD & 10 & 0.43 & 0.3529 \\
+        \hline
+    \end{tabular}
+\end{table}
+
+In this evaluation, EMD achieved a higher mean precision than cosine distance at both values of \(k\). At \(k=10\), for example, the mean precision was 0.43 for EMD and 0.36 for cosine distance. This suggests that EMD may be a useful option for this retrieval task. Still, the evaluation includes only ten queries, so the difference should be treated as an initial result rather than a final conclusion.
+
+\subsection{Discussion}
+
+Overall, the experiments show that both feature preparation and the choice of distance measure can affect retrieval quality. The strongest result in the configuration comparison came from weighted descriptors with missing values replaced by the mean, while histogram features alone produced a lower score. The separate distance comparison also favoured EMD over cosine distance for the tested queries.
+These results should be interpreted with some care. Only ten query shapes were used in the evaluation, and performance can vary between classes. A larger evaluation set would help determine whether the observed differences remain consistent. It would also be useful to inspect the retrieved shapes for individual queries, since a single average score does not show every strength or weakness of the retrieval system.
+
+\documentclass[10pt,a4paper]{article}
+
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage[a4paper,top=2.0cm,bottom=2.0cm,left=2.2cm,right=2.2cm]{geometry}
+\usepackage{microtype}
+
+% mathematics
+\usepackage{amsmath,amssymb}
+
+% figures and tables
+\usepackage{graphicx}
+\usepackage{adjustbox}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage[font=small,labelfont=bf,skip=3pt]{caption}
+\usepackage{subcaption}
+\usepackage{xcolor}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning}
+\usepackage{enumitem}
+\usepackage{url}
+
+% compact spacing
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{3.5pt plus 1pt}
+\linespread{1.0}
+\usepackage{titlesec}
+\titlespacing*{\section}{0pt}{12pt plus 2pt minus 2pt}{5pt plus 1pt}
+\titlespacing*{\subsection}{0pt}{9pt plus 2pt minus 2pt}{3pt plus 1pt}
+\titlespacing*{\subsubsection}{0pt}{7pt plus 2pt minus 1pt}{2pt plus 1pt}
+\titleformat{\section}{\large\bfseries}{\thesection}{0.6em}{}
+\titleformat{\subsection}{\normalsize\bfseries}{\thesubsection}{0.6em}{}
+\titleformat{\subsubsection}{\normalsize\bfseries\itshape}{\thesubsubsection}{0.6em}{}
+\setlength{\textfloatsep}{9pt plus 2pt minus 2pt}
+\setlength{\floatsep}{7pt plus 2pt minus 2pt}
+\setlength{\intextsep}{7pt plus 2pt minus 2pt}
+\renewcommand{\arraystretch}{1.08}
+\setlist{nosep,leftmargin=1.4em}
+
+% numbering: tables and figures are numbered per section (Table 2.3, Figure 1.4, ...)
+\setcounter{secnumdepth}{3}
+\usepackage{chngcntr}
+\counterwithin{table}{section}
+\counterwithin{figure}{section}
+\counterwithin{equation}{section}
+
+% all figures are in this folder
+\graphicspath{{Images/}}
+
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\card}[1]{\lvert #1\rvert}
+
+\usepackage[hidelinks,pdfusetitle]{hyperref}
+
+\subsection{Conclusion}
+In this step, the global shape descriptors from Step 3 were prepared for retrieval, and several normalization, feature-handling, and distance-measure options were evaluated. The best Precision@10 among the tested configurations was 0.3217, achieved by weighted descriptors with missing values replaced by the mean. In the separate distance-measure evaluation, EMD achieved a mean Precision@10 of 0.43, compared with 0.36 for cosine distance.
+The results indicate that the representation and distance measure both matter for shape retrieval. Since the evaluation used ten queries, further testing would be needed before treating these results as conclusive.
+
 \clearpage
 \section*{References}
 \addcontentsline{toc}{section}{References}
@@ -1501,6 +1646,14 @@ Table~\ref{tab:s4options} slightly too high.
   \url{https://webspace.science.uu.nl/~telea001/MR/Slides}.
 \item[{[17]}] A. C. Telea, Multimedia Retrieval, Technical tips: Step 3 (parts 1--3), Utrecht University. Available:
   \url{https://webspace.science.uu.nl/~telea001/MR/TechnicalTips}.
+\item[{[18]}] A. C. Telea, Multimedia Retrieval, Module 5: Matching, lecture slides, Utrecht University. Available:
+  \url{https://webspace.science.uu.nl/~telea001/MR/Slides}.
+\item[{[19]}] A. C. Telea, Multimedia Retrieval, Technical tips: Step 4, Utrecht University. Available:
+  \url{https://webspace.science.uu.nl/~telea001/MR/TechnicalTips}.
+\item[{[20]}] A. C. Telea, Multimedia Retrieval, Module 7: Evaluation, lecture slides, Utrecht University. Available:
+  \url{https://webspace.science.uu.nl/~telea001/MR/Slides}.
+\item[{[1]}] A. C. Telea, Multimedia Retrieval -- Assignment, Utrecht University. Available:
+  \url{https://webspace.science.uu.nl/~telea001/MR/Assignment}.
 \item[{[18]}] A. C. Telea, Multimedia Retrieval, Module 5: Matching, lecture slides, Utrecht University. Available:
   \url{https://webspace.science.uu.nl/~telea001/MR/Slides}.
 \item[{[19]}] A. C. Telea, Multimedia Retrieval, Technical tips: Step 4, Utrecht University. Available:
