@@ -1,12 +1,10 @@
-"""Step 3.1: alignment and flipping of the database normalized in Step 2.5, with the verification
-of the whole four-step normalization.
+"""Step 3.1: full four-step normalization (translation, alignment, flipping, scaling) of the resampled
+database, with the verification of every step.
 
-    python src/normalize_shapes.py       # Step 2.5 first: centering and scaling
-    python src/run_step3_1.py            # uses the cached log if it exists
-    python src/run_step3_1.py --force    # recompute (a few minutes with 8 cores)
+    python run_step3_1.py            # uses the cached log if it exists
+    python run_step3_1.py --force    # recompute (about 6 minutes with 4 worker processes)
 
-Input : processed/step2_normalized/<class>/<file>.obj  (output of Step 2.5)
-        processed/step2_full/<class>/<file>.obj        (output of Step 2.3, for the 'before' measures)
+Input : processed/step2_full/<class>/<file>.obj        (output of Step 2.3)
 Output: processed/step3_normalized/<class>/<file>.obj  (input for Step 3.2)
 Logs  : report/data/step3/normalize_log.csv            (measures before and after, per shape)
         report/data/step3/stats_step2_resampled.csv    (Step 2.2 statistics tool, before)
@@ -20,7 +18,7 @@ import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from mr_io import PROJECT_ROOT
-from mr_normalize import STEP2_DIR, STEP2_NORM_DIR, STEP3_DIR, run_normalization
+from mr_normalize import STEP2_DIR, STEP3_DIR, run_normalization
 from mr_stats import list_shapes, scan_database
 
 AMBIGUOUS = 1.01    # eigenvalue ratio below which two principal axes are treated as interchangeable

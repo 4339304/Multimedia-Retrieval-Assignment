@@ -3,7 +3,7 @@ Step 3.2: global and histogram-based 3D shape descriptors.
 
 Run from the project folder:
     python run_s3_2.py --limit 5         test on the first 5 shapes
-    python run_s3_2.py                   whole database (about 16 minutes on 8 cores)
+    python run_s3_2.py                   whole database (about 17 minutes with 6 worker processes)
     python run_s3_2.py --shape Data/Bird/D00089.obj
                                          print the features of one shape (read from the feature
                                          table if the shape is in it, else computed)

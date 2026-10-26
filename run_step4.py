@@ -88,7 +88,7 @@ def transform(df):
 
 
 def fit_normalization(db, method="standard"):
-    """Parameters of the normalization, computed on the database only (missing values are skipped)."""
+    """Parameters of the normalization, computed on the database shapes only (not on the query shapes)."""
     t = transform(db)
     rows = []
     for c in GLOBALS:
@@ -241,8 +241,7 @@ def compare(k=10):
     results = []
 
     def single_vector(G):
-        """All values in one vector, plain Euclidean distance; a missing value gets the mean of its column."""
-        G = np.where(np.isnan(G), np.nanmean(G, axis=0), G)
+        """All values in one vector, plain Euclidean distance."""
         return precision_at_k(cdist(np.hstack([G, H]), np.hstack([G, H])), classes, k)
 
     raw = db[GLOBALS].to_numpy(float)

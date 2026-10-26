@@ -59,6 +59,7 @@ Multimedia Retrieval assignment - code for Steps 1 to 4
                                           all shapes within a radius of the query
        python run_step5_tsne.py --perplexity 30 --iterations 1000 --seed 42
                                           t-SNE map (interactive HTML, hover for the shape)
+       python figures_step5.py            figure of the t-SNE map for the report
    Results: report/data/step4/step5/ (index, query results, t-SNE positions and plot),
             report/data/step4/3d-shape-feature-database-t-sne-2d-embed.png (t-SNE screenshot),
             report/data/step4/step5/validation/ (validation logs and screenshot)

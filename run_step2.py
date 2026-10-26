@@ -1,7 +1,7 @@
 """Re-run the Step 2 computations from the command line.
 
     python src/run_step2.py                 # uses cached csv results where they exist (seconds)
-    python src/run_step2.py --force         # recompute everything (about 7 minutes with 8 cores)
+    python src/run_step2.py --force         # recompute everything (about 6 minutes with 8 worker processes)
     python src/run_step2.py --force --skip-full   # only the database scan and the reduced database (about 2 minutes)
 """
 import argparse

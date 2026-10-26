@@ -1,21 +1,20 @@
-"""Step 3.1: full (four-step) normalization, continuing from Step 2.5.
+"""Step 3.1: full (four-step) normalization.
 
 The four steps of Module 4, in the order of the technical tips:
 
-    Step 2.5 (normalize_shapes.py)       translation  ->  scaling
-    Step 3.1 (this file)                 alignment    ->  flipping  ->  scaling again
+    translation  ->  alignment  ->  flipping  ->  scaling
 
-Step 3.1 reads the output of Step 2.5 (processed/step2_normalized), which is already centered at the
-vertex barycenter and scaled to a largest bounding-box side of 1. It adds the alignment and the
-flipping. The scaling is repeated at the end, because the rotation changes the bounding box.
+Step 3.1 reads the resampled shapes of Step 2.3 (processed/step2_full) and applies all four steps, so
+every shape is scaled only once, after the alignment has changed its axis-aligned bounding box. Step 2.5
+(normalize_shapes.py) does the translation and the scaling alone, as asked in the assignment for Step 2.
 
     center(V)    -> V          vertex barycenter to the origin    (same formula as Step 2.5)
     align(V)     -> V          major/medium eigenvector onto x/y  (Step 3.1)
     flip(V, F)   -> (V, F)     most of the mass on the positive side of each axis (Step 3.1)
     scale(V)     -> V          largest bounding-box side becomes 1 (same formula as Step 2.5)
 
-center() and scale() use exactly the formulas of Step 2.5, so normalize() gives the same result for a
-shape that did not go through Step 2.5 (e.g. a query shape). All functions take NumPy arrays
+center() and scale() use exactly the formulas of Step 2.5. A query shape goes through normalize() in
+the same way as the database shapes. All functions take NumPy arrays
 (V: (n, 3) float, F: (m, 3) int) and return new arrays.
 """
 import time
@@ -28,7 +27,6 @@ import pandas as pd
 from mr_io import PROJECT_ROOT, mesh_arrays, write_obj
 
 STEP2_DIR = PROJECT_ROOT / "processed" / "step2_full"             # resampled shapes (Step 2.3)
-STEP2_NORM_DIR = PROJECT_ROOT / "processed" / "step2_normalized"  # centered and scaled (Step 2.5)
 STEP3_DIR = PROJECT_ROOT / "processed" / "step3_normalized"       # fully normalized (Step 3.1)
 
 
@@ -195,13 +193,13 @@ def process_file(args):
     return rec
 
 
-def run_normalization(in_dir=STEP2_NORM_DIR, out_dir=STEP3_DIR, raw_dir=STEP2_DIR, workers=4, cache_csv=None,
+def run_normalization(in_dir=STEP2_DIR, out_dir=STEP3_DIR, raw_dir=STEP2_DIR, workers=4, cache_csv=None,
                       force=False, verbose=True):
-    """Normalize every shape of in_dir (class sub-folders, output of Step 2.5) into out_dir."""
+    """Normalize every shape of in_dir (class sub-folders, output of Step 2.3) into out_dir."""
     if cache_csv is not None and Path(cache_csv).exists() and not force:
         return pd.read_csv(cache_csv)
     if not Path(in_dir).exists():
-        raise FileNotFoundError(f"{in_dir} not found. Run Step 2.5 first (python src/normalize_shapes.py).")
+        raise FileNotFoundError(f"{in_dir} not found. Run Step 2.3 first (python run_step2.py).")
     paths = sorted(Path(in_dir).glob("*/*.obj"))
     jobs = [(str(p), str(Path(raw_dir) / p.parent.name / p.name),
              None if out_dir is None else str(Path(out_dir) / p.parent.name / p.name)) for p in paths]
