@@ -9,11 +9,13 @@ from pathlib import Path
 import numpy as np
 import trimesh
 
-# The project folder holds Data/, processed/ and report/. It is the folder of the .py files if Data/
-# lies next to them, else the folder above (code in a src/ or repository sub-folder).
+# The project folder holds processed/ and report/. It is the folder of the .py files if report/ lies
+# next to them (flat repository), else the folder above (code in a src/ sub-folder). The shape database
+# Data/ is looked up next to the .py files first and then one folder up, so it can also lie next to a
+# downloaded repository.
 _HERE = Path(__file__).resolve().parent
-PROJECT_ROOT = _HERE if (_HERE / "Data").is_dir() or not (_HERE.parent / "Data").is_dir() else _HERE.parent
-DATA_DIR = PROJECT_ROOT / "Data"
+PROJECT_ROOT = _HERE if (_HERE / "report").is_dir() or not (_HERE.parent / "report").is_dir() else _HERE.parent
+DATA_DIR = next((p / "Data" for p in (_HERE, _HERE.parent) if (p / "Data").is_dir()), PROJECT_ROOT / "Data")
 
 
 def load_mesh(path) -> trimesh.Trimesh:

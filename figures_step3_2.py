@@ -31,9 +31,9 @@ DATA = PROJECT_ROOT / "report" / "data" / "step3"
 RENDERS = FIG / "renders_3_2"
 CLASSES = ["Mug", "Sword", "Humanoid", "Car"]
 SIMILAR = [("Car", "m1521.obj"), ("Car", "m1526.obj"), ("Humanoid", "m213.obj")]
-DEMO = [("sphericity", "sphericity"), ("rectangularity_3d", "3D rectangularity"), ("convexity", "convexity"),
+DEMO = [("mesh_volume", "volume"), ("sphericity", "sphericity"), ("rectangularity_3d", "3D rectangularity"), ("convexity", "convexity"),
         ("eccentricity", "eccentricity"), ("diameter", "diameter"), ("surface_area", "surface area")]
-VOLUME_BASED = {"sphericity", "rectangularity_3d", "convexity"}
+VOLUME_BASED = {"mesh_volume", "sphericity", "rectangularity_3d", "convexity"}
 COLORS = ["#1f77b4", "#d62728", "#2ca02c", "#9467bd"]
 
 
@@ -167,7 +167,7 @@ def _maxima(path):
 
 def ranges():
     paths = sorted(STEP3_DIR.glob("*/*.obj"))
-    with ProcessPoolExecutor(8) as ex:
+    with ProcessPoolExecutor(4) as ex:
         rows = list(ex.map(_maxima, paths, chunksize=8))
     d = pd.DataFrame(rows, columns=["class", "file"] + NAMES)
     d.to_csv(DATA / "s32_descriptor_maxima.csv", index=False)
@@ -196,7 +196,7 @@ def bin_study():
     for c in sorted(p for p in STEP3_DIR.iterdir() if p.is_dir()):
         files = sorted(c.glob("*.obj"))
         paths += [files[i] for i in rng.choice(len(files), 2, replace=False)]
-    with ProcessPoolExecutor(8) as ex:
+    with ProcessPoolExecutor(4) as ex:
         rows = [r for rr in ex.map(_noise, paths) for r in rr]
     d = pd.DataFrame(rows, columns=["class", "file", "samples", "name", "B", "noise", "h"])
     noise = d.pivot_table(index=["name", "samples"], columns="B", values="noise")

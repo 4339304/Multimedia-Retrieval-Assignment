@@ -18,7 +18,8 @@ BAND = (5000, 10000)
 TOL = 0.10          # accept results within +-10% of V_TARGET
 MAX_SUBDIV = 8
 MAX_OPEN_FRACTION = 0.01   # a component counts as "closed" if <=1% of its faces touch a bad edge
-MAX_DEVIATION = 0.05       # decimation may move the surface by at most 5% of the bbox diagonal (Hausdorff)
+MAX_AREA_CHANGE = 0.30     # a decimation may change the surface area by at most 30 %
+REFINE_STEP = 1.1          # the edge length is divided by this factor in every refinement iteration
 
 
 # ----------------------------------------------------------------------------- cleaning
@@ -206,21 +207,23 @@ def cluster_to_vertices(V, F, v_target=V_TARGET, tol=0.05, iters=30):
     return np.asarray(best.vertices), np.asarray(best.triangles, dtype=np.int64), it
 
 
-def decimate_robust(V, F, v_target=V_TARGET, band=BAND, tol=TOL, max_deviation=MAX_DEVIATION):
-    """Decimate to v_target; if the result is outside the band or deviates from the input surface by more
-    than max_deviation (Hausdorff, relative to the bbox diagonal), try the fall-backs and keep the best.
+def decimate_robust(V, F, v_target=V_TARGET, band=BAND, tol=TOL, max_area_change=MAX_AREA_CHANGE):
+    """Decimate to v_target; if the result is outside the band or its surface area differs from the input
+    by more than max_area_change, try the fall-backs. The first accepted result is used; if none is accepted,
+    the result inside the band with the smallest area change is kept.
 
     Order: quadric (default) -> quadric with a strong boundary weight -> vertex clustering."""
     strategies = [("quadric", lambda: decimate_to_vertices(V, F, v_target, tol)),
                   ("quadric_bw100", lambda: decimate_to_vertices(V, F, v_target, tol, boundary_weight=100.0)),
                   ("vertex_clustering", lambda: cluster_to_vertices(V, F, v_target))]
+    area = triangle_areas(V, F).sum()
     tried = []
     for name, run in strategies:
         V2, F2, iters = run()
-        dev = fidelity(V, F, V2, F2)["hausdorff_rel"]
+        change = abs(triangle_areas(V2, F2).sum() - area) / area
         ok = band[0] <= len(V2) <= band[1]
-        tried.append((not ok, dev, name, V2, F2, iters))
-        if ok and dev <= max_deviation:
+        tried.append((not ok, change, name, V2, F2, iters))
+        if ok and change <= max_area_change:
             break
     _, _, name, V2, F2, iters = min(tried, key=lambda t: (t[0], t[1]))
     return V2, F2, iters, name, len(tried) > 1
@@ -276,31 +279,24 @@ def split_long_edges(V, F, L):
     return V, np.concatenate(parts).astype(np.int64), True
 
 
-def refine_adaptive(V, F, v_target=V_TARGET, tol=TOL, max_iter=10, max_attempts=8, band=BAND):
-    """Edge-length based (= area based) refinement towards v_target vertices.
-
-    Only edges longer than L are split, so large triangles are refined and small ones are left alone,
-    which makes triangle sizes more uniform. For equilateral triangles of edge L covering a surface of
-    area A there are N_F = 4A / (sqrt(3) L^2) faces and about N_F / 2 vertices; L is derived from
-    v_target and then corrected (N_V ~ 1/L^2) by up to `max_attempts` restarts.
-    """
-    area = triangle_areas(V, F).sum()
-    L = 1.4 * np.sqrt(4.0 * area / (np.sqrt(3.0) * 2.0 * v_target))
-    best = None
-    for attempt in range(1, max_attempts + 1):
-        V2, F2 = V, F
-        for _ in range(max_iter):
-            V2, F2, changed = split_long_edges(V2, F2, L)
-            if not changed or len(F2) > 12 * v_target:
-                break
-        # prefer candidates inside the acceptance band, then the one closest to the target
-        score = abs(np.log(len(V2) / v_target)) + (0.0 if band[0] <= len(V2) <= band[1] else 10.0)
-        if best is None or score < best[2]:
-            best = (V2, F2, score, attempt)
-        if (1 - tol) * v_target <= len(V2) <= (1 + tol) * v_target:
-            break
-        L *= np.sqrt(len(V2) / v_target)          # N_V is roughly proportional to 1 / L^2
-    return best[0], best[1], best[3]
+def refine_adaptive(V, F, v_target=V_TARGET, step=REFINE_STEP):
+    """Edge-length based refinement. Starting from the longest edge, the edge length L is divided by `step`
+    in every iteration and all edges longer than L are split, until the vertex count first exceeds v_target.
+    The result of that iteration or of the previous one, whichever is closer to v_target, is kept, so the
+    number of iterations follows from the shape and is not a parameter."""
+    e = np.concatenate([F[:, [0, 1]], F[:, [1, 2]], F[:, [2, 0]]])
+    L = float(np.linalg.norm(V[e[:, 0]] - V[e[:, 1]], axis=1).max())
+    prev, it = (V, F), 0
+    while len(V) < v_target and len(F) < 20 * v_target:
+        prev = (V, F)
+        L /= step
+        changed = True
+        while changed:
+            V, F, changed = split_long_edges(V, F, L)
+        it += 1
+    if abs(np.log(len(prev[0]) / v_target)) < abs(np.log(len(V) / v_target)):
+        V, F = prev
+    return V, F, it
 
 
 def resample_mesh(V, F, v_target=V_TARGET, band=BAND, tol=TOL, refine="adaptive"):
@@ -317,7 +313,7 @@ def resample_mesh(V, F, v_target=V_TARGET, band=BAND, tol=TOL, refine="adaptive"
     if len(V) < lo:
         log["action"] = "refined"
         if refine == "adaptive":
-            V, F, log["subdiv_iters"] = refine_adaptive(V, F, v_target, tol, band=band)
+            V, F, log["subdiv_iters"] = refine_adaptive(V, F, v_target)
             if len(V) < lo:                      # safety net: still below the band -> uniform subdivision
                 V, F = trimesh.remesh.subdivide(V, F)
         else:

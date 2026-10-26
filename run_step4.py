@@ -32,9 +32,7 @@ from mr_normalize import STEP3_DIR, normalize
 from mr_resample import clean_mesh, fix_orientation, resample_mesh
 from run_s3_2 import FEATURES_CSV, NAMES, features_of
 
-PROJECT_ROOT = Path(__file__).resolve().parent
 OUT = PROJECT_ROOT / "report" / "data" / "step4"
-FEATURES_CSV = PROJECT_ROOT / "report" / "data" / "step3" / "features_step3_2.csv"
 NORM_CSV = OUT / "features_normalized.csv"
 PARAMS_CSV = OUT / "normalization_params.csv"
 QUERY_CSV = OUT / "query_shapes.csv"
@@ -119,8 +117,7 @@ def euclidean(a, b):
 
 def descriptor_distances(q, X, hist_metric=euclidean):
     """Distance of the query row q to every row of X, separately for every descriptor: an (n, 11) array.
-    A global descriptor gives |q - x|; a histogram gives hist_metric between the two histograms.
-    A missing value gives NaN."""
+    A global descriptor gives |q - x|; a histogram gives hist_metric between the two histograms."""
     D = np.empty((len(X), len(DESCRIPTORS)))
     for k, c in enumerate(GLOBALS):
         D[:, k] = np.abs(X[c].to_numpy(float) - float(q[c]))
@@ -145,11 +142,9 @@ def fit_distance_scales(db_norm, hist_metric=euclidean, seed=0):
 
 
 def combined_distance(D, scales):
-    """Euclidean combination of the weighted descriptor distances. Missing descriptors are left out and the
-    sum is scaled up to all descriptors, so that shapes with missing values are not closer or farther."""
+    """Euclidean combination of the weighted descriptor distances (every shape has all descriptors)."""
     W = D / scales[DESCRIPTORS].to_numpy(float)
-    n_avail = np.isfinite(W).sum(axis=1)
-    return np.sqrt(np.nansum(W ** 2, axis=1) * len(DESCRIPTORS) / n_avail)
+    return np.sqrt((W ** 2).sum(axis=1))
 
 
 # ------------------------------------------------------------------ query shape: same steps as the database
@@ -270,9 +265,6 @@ def compare(k=10):
     norm = apply_normalization(db, params)
     results.append(("weighted descriptors, standardized, log", weighted(norm)))
     results.append(("weighted descriptors, min-max, log", weighted(apply_normalization(db, fit_normalization(db, "minmax")))))
-    filled = norm.copy()
-    filled[GLOBALS] = filled[GLOBALS].fillna(0.0)          # 0 = mean of the standardized feature
-    results.append(("weighted descriptors, missing values set to the mean", weighted(filled)))
     global LOG_FEATURES
     keep, LOG_FEATURES = LOG_FEATURES, []
     results.append(("weighted descriptors, standardized, no log", weighted(apply_normalization(db, fit_normalization(db)))))

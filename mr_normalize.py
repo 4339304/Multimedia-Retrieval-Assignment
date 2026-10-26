@@ -115,6 +115,7 @@ def measures(V, F):
     bary_dist   |m|: distance of the vertex barycenter from the origin    -> 0 after translation
     angle_e1    angle between the major eigenvector and the x axis (deg)  -> 0 after alignment
     angle_e2    angle between the medium eigenvector and the y axis (deg) -> 0 after alignment
+    angle_e3    angle between the minor eigenvector and the z axis (deg)  -> 0 after alignment
     f_x/f_y/f_z moment test values (around the origin)                     -> >= 0 after flipping
     d_max       largest side of the axis-aligned bounding box             -> 1 after scaling
     ratio_12, ratio_23   lambda1/lambda2, lambda2/lambda3: close to 1 means the axes are ambiguous
@@ -128,6 +129,7 @@ def measures(V, F):
         "bary_dist": float(np.linalg.norm(barycenter(V))),
         "angle_e1": float(np.degrees(np.arccos(np.clip(abs(E[0, 0]), 0, 1)))),
         "angle_e2": float(np.degrees(np.arccos(np.clip(abs(E[1, 1]), 0, 1)))),
+        "angle_e3": float(np.degrees(np.arccos(np.clip(abs(E[2, 2]), 0, 1)))),
         "f_x": float(f[0]), "f_y": float(f[1]), "f_z": float(f[2]),
         "f_rel_min": float((f / max(np.abs(f).sum(), eps)).min()),
         "d_max": float(np.ptp(V, axis=0).max()),
@@ -193,7 +195,7 @@ def process_file(args):
     return rec
 
 
-def run_normalization(in_dir=STEP2_NORM_DIR, out_dir=STEP3_DIR, raw_dir=STEP2_DIR, workers=8, cache_csv=None,
+def run_normalization(in_dir=STEP2_NORM_DIR, out_dir=STEP3_DIR, raw_dir=STEP2_DIR, workers=4, cache_csv=None,
                       force=False, verbose=True):
     """Normalize every shape of in_dir (class sub-folders, output of Step 2.5) into out_dir."""
     if cache_csv is not None and Path(cache_csv).exists() and not force:

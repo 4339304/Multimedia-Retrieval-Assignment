@@ -32,12 +32,12 @@ def main():
     ap.add_argument("--force", action="store_true", help="recompute even if a cached csv exists")
     args = ap.parse_args()
 
-    log = run_normalization(STEP2_NORM_DIR, STEP3_DIR, STEP2_DIR, force=args.force,
+    # all four steps (translation, alignment, flipping, scaling) are applied to the resampled shapes of
+    # Step 2.3, with the centering and scaling functions of Step 2.5; the scaling is done once, at the end
+    log = run_normalization(STEP2_DIR, STEP3_DIR, STEP2_DIR, force=args.force,
                             cache_csv=PROJECT_ROOT / "report" / "data" / "step3" / "normalize_log.csv")
     ok = log[log.status == "ok"]
     print(f"3.1: {len(log)} shapes, status {log.status.value_counts().to_dict()}")
-    print(f"  input from Step 2.5: max |m| {ok.input_bary_dist.max():.2e}, "
-          f"d_max {ok.input_d_max.min():.6f} .. {ok.input_d_max.max():.6f}")
     print(f"  translation  max |m| after           : {ok.bary_dist_after.max():.2e}")
     # an eigenvector is only defined if its eigenvalue differs from the others (ratio > AMBIGUOUS)
     d1 = ok.ratio_12_after > AMBIGUOUS
@@ -46,6 +46,7 @@ def main():
           f"({d1.sum()} shapes with lambda1/lambda2 > {AMBIGUOUS}; {(~d1).sum()} ambiguous)")
     print(f"               max angle(e2, y) after   : {ok.angle_e2_after[d2].max():.2e} deg "
           f"({d2.sum()} shapes with distinct eigenvalues; {(~d2).sum()} ambiguous)")
+    print(f"               max angle(e3, z) after   : {ok.angle_e3_after[d2].max():.2e} deg")
     # a moment that is zero up to rounding (relative to sum |f_k|) belongs to a symmetric axis
     fmin = ok[["f_x_after", "f_y_after", "f_z_after"]].min(axis=1)
     print(f"  flipping     shapes with all f_k >= 0 : {(fmin >= 0).sum()}/{len(ok)}, "

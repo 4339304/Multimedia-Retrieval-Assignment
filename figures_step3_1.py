@@ -82,7 +82,8 @@ def renders():
 def histograms():
     d = pd.read_csv(LOG)
     d = d[d.status == "ok"]
-    fig, ax = plt.subplots(1, 4, figsize=(13, 2.9))
+    fig, axes = plt.subplots(2, 3, figsize=(12, 5.6))
+    ax = axes.ravel()
 
     def pair(a, before, after, bins, title, xlabel, logx=False):
         a.hist(after, bins=bins, color="#1f77b4", label="after")
@@ -95,15 +96,20 @@ def histograms():
 
     pair(ax[0], d.bary_dist_before, d.bary_dist_after, np.logspace(-15, 9, 49),
          "(a) translation", r"$\|\bar v\|$: distance of the barycenter to the origin", logx=True)
-    pair(ax[1], d.angle_e1_before, d.angle_e1_after, np.linspace(0, 90, 19),
-         "(b) alignment", r"angle between $e_1$ and the $x$ axis (deg)")
+    # alignment of all three axes; shapes with (almost) equal eigenvalues have no defined axis and are left out
+    d1 = d[d.ratio_12_after > 1.01]
+    d2 = d1[d1.ratio_23_after > 1.01]
+    for k, (dd, e, axis) in enumerate([(d1, "e1", "x"), (d2, "e2", "y"), (d2, "e3", "z")], start=1):
+        pair(ax[k], dd[f"angle_{e}_before"], dd[f"angle_{e}_after"], np.linspace(0, 90, 19),
+             f"({'bcd'[k - 1]}) alignment, ${e[0]}_{e[1]}$", rf"angle between ${e[0]}_{e[1]}$ and the ${axis}$ axis (deg)")
     neg_b = (d[["f_x_before", "f_y_before", "f_z_before"]] < 0).sum(axis=1)
     neg_a = (d[["f_x_after", "f_y_after", "f_z_after"]] < 0).sum(axis=1)
-    pair(ax[2], neg_b, neg_a, np.arange(-0.5, 4), "(c) flipping", r"number of axes with $f_k<0$")
-    ax[2].set_xticks([0, 1, 2, 3])
-    pair(ax[3], d.d_max_before, d.d_max_after, np.logspace(-2, 9, 45),
-         "(d) scaling", r"$D_{\max}$: largest side of the bounding box", logx=True)
+    pair(ax[4], neg_b, neg_a, np.arange(-0.5, 4), "(e) flipping", r"number of axes with $f_k<0$")
+    ax[4].set_xticks([0, 1, 2, 3])
+    pair(ax[5], d.d_max_before, d.d_max_after, np.logspace(-2, 9, 45),
+         "(f) scaling", r"$D_{\max}$: largest side of the bounding box", logx=True)
     ax[0].set_ylabel("number of shapes", fontsize=9)
+    ax[3].set_ylabel("number of shapes", fontsize=9)
     ax[0].legend(fontsize=8)
     fig.tight_layout()
     FIG.mkdir(parents=True, exist_ok=True)

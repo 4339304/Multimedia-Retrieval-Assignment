@@ -101,7 +101,7 @@ def analyze_obj(path) -> dict:
     return rec
 
 
-def scan_database(shapes: pd.DataFrame, workers=8, cache_csv=None, force=False, verbose=True):
+def scan_database(shapes: pd.DataFrame, workers=4, cache_csv=None, force=False, verbose=True):
     """Run analyze_obj over all shapes in parallel (largest files first). Cached as CSV."""
     if cache_csv is not None and Path(cache_csv).exists() and not force:
         return pd.read_csv(cache_csv)

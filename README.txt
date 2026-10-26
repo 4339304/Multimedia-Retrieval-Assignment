@@ -14,18 +14,19 @@ Multimedia Retrieval assignment - code for Steps 1 to 4
    The Plotly viewer and the database-wide load test are in step1_read_and_view.ipynb.
 
 4. Step 2 - analysis, resampling, checking and normalization (run in this order):
-       python run_step2.py --force        2.1-2.3: statistics and resampling (about 7 minutes)
+       python run_step2.py --force        2.1-2.3: statistics and resampling (about 6 minutes)
        python check_resampling.py         2.4: check of the resampled database (about 3 minutes)
        python normalize_shapes.py         2.5: centering and scaling (about 8 minutes)
    Figures and statistics for the report: step2_preprocessing.ipynb
+       python figures_step2_3.py          large figures of the decimation cases and orientation conflicts
 
-5. Step 3.1 - full normalization (alignment and flipping), needs the output of 2.5:
-       python run_step3_1.py --force      (about 4 minutes)
+5. Step 3.1 - full normalization (translation, alignment, flipping, scaling), starts from the output of 2.3:
+       python run_step3_1.py --force      (about 6 minutes with 4 worker processes)
        python figures_step3_1.py          figures for the report
 
 6. Step 3.2 - shape descriptors, needs the output of 3.1 (8 GB memory is enough):
        python validate_step3_2.py         check on a cube, sphere, box and open box
-       python run_s3_2.py                 all shapes (about 16 minutes on 8 cores)
+       python run_s3_2.py                 all shapes (about 17 minutes with 6 worker processes)
        python run_s3_2.py --shape processed/step3_normalized/Mug/D00685.obj
                                           print the features of one shape
        python figures_step3_2.py          figures for the report
@@ -40,37 +41,27 @@ Multimedia Retrieval assignment - code for Steps 1 to 4
        python run_step4.py --query Mug/D00685.obj -k 5
                                           query with a shape of the database (class/file)
        python run_step4.py --compare      compare the normalization and weighting options (about 1 minute)
+       python run_step4_metrics.py --compare
+                                          cosine distance and EMD for the histograms, on the query shapes
        python figures_step4.py            figures for the report
 
-8. Step 5 - approximate nearest-neighbour search and t-SNE visualization:
-
-       python run_step5.py --build
-              build the HNSW approximate nearest-neighbour index
-
+8. Step 5 - approximate nearest-neighbour search and t-SNE map, needs the normalized features of Step 4:
+       python run_step5.py --build        build the HNSW index of all feature vectors (optional: a query
+                                          builds it by itself if it is missing or older than the features)
        python run_step5.py --query Mug/D00685.obj --compare -k 10
-              query the ANN index and compare the results with Step 4
-
+                                          query the index and compare with the exact search of Step 4
        python run_step5.py --query HumanHead/D00591.obj --compare -k 10
        python run_step5.py --query Computer/m1778.obj --compare -k 10
        python run_step5.py --query Quadruped/D00795.obj --compare -k 10
        python run_step5.py --query Hand/D01022.obj --compare -k 10
-              test five query shapes and record the ANN search time,
-              exact search time and recall@10
-
+                                          the other test queries (search time and recall@10)
        python run_step5.py --query Mug/D00685.obj --radius 2.7 --max-candidates 2473
-              perform a radius-based query for the Mug shape
-
+                                          all shapes within a radius of the query
        python run_step5_tsne.py --perplexity 30 --iterations 1000 --seed 42
-              generate the two-dimensional t-SNE visualization
-
-       Results and index files are saved in:
-       report/data/step4/step5/
-
-       t-SNE screenshot:
-       report/data/step4/3d-shape-feature-database-t-sne-2d-embed.png
-
-       Validation logs and screenshot:
-       report/data/step4/step5/validation/
+                                          t-SNE map (interactive HTML, hover for the shape)
+   Results: report/data/step4/step5/ (index, query results, t-SNE positions and plot),
+            report/data/step4/3d-shape-feature-database-t-sne-2d-embed.png (t-SNE screenshot),
+            report/data/step4/step5/validation/ (validation logs and screenshot)
 
 Results:
    processed/step2_full/                        resampled shapes (Step 2.3)

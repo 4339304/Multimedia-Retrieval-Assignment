@@ -15,8 +15,8 @@ Output: report/data/step3/features_step3_2.csv
 
 Volume: meshes that are not closed get their holes filled with a triangle fan around the center
 of each hole (technical tips 3b); the volume is then computed with the barycenter as reference
-point (Module 4). A volume is kept only if it is positive, not larger than the convex hull volume
-and not more compact than a sphere; otherwise the volume-based descriptors are NaN.
+point (Module 4). If this volume is impossible (not positive, larger than the convex hull volume or
+more compact than a sphere), a rough estimate is used instead and the shape is marked as "estimate".
 The distribution descriptors A3, D2, D3, D4 use random vertex tuples without repeated vertices,
 with a reproducible per-shape random seed; D1 uses all vertices. Histograms store normalized
 frequencies.
@@ -155,7 +155,10 @@ def global_descriptors(V, F):
     # a volume is impossible if it is larger than the hull volume, or larger than the volume of a
     # sphere with the same surface area (no shape is more compact than a sphere)
     if not (EPS < volume <= HULL_TOLERANCE * hull_volume and 36.0 * math.pi * volume**2 <= closed_area**3):
-        volume, source = np.nan, "invalid"
+        # rough estimate instead of no value: the size of the computed volume, limited to what is possible
+        # (at most the hull volume and the volume of a sphere with the same surface area)
+        volume = min(max(abs(volume), EPS), hull_volume, closed_area**1.5 / math.sqrt(36.0 * math.pi))
+        source = "estimate"
 
     out = {
         "surface_area": area,
