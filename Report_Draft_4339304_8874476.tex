@@ -94,8 +94,49 @@
 \end{titlepage}
 
 \section*{Recent Changes}
-This report is still a work in progress. The changes compared with the previous version will be specified in a later version
-of the report.
+Changes compared with the version of 14 October. Steps 2.3 to 4 were run again with the changed methods, and all numbers,
+tables and figures of these steps were updated.
+
+\textbf{New parts.} The second part of Step~4, cosine distance and Earth Mover's Distance (Section~\ref{sec:s4metrics}), and
+Step~5, the nearest-neighbor search with an HNSW index and the t-SNE map of the database (Section~\ref{sec:step5}).
+
+\textbf{Methods.}
+\begin{itemize}
+  \item Refinement (Section~\ref{sec:resampling}): the edge length $L$ now starts at the longest edge and is divided by 1.1 in
+  every step until the vertex count first passes the target; the closer of the last two results is kept. The number of steps
+  is no longer fixed (Eq.~\eqref{eq:refineL}).
+  \item Decimation (Section~\ref{sec:resampling}): a result is now accepted by the change of the surface area
+  (Eq.~\eqref{eq:areachange}), which is much cheaper; the Hausdorff distance is only measured. Its cost and the choice of 20,000
+  points are explained. Two shapes pass the area check with a larger deviation (Figure~\ref{fig:s23twoshapes}).
+  \item Volume (Section~\ref{sec:descriptors}): shapes with an impossible volume now get a rough estimate
+  (Eq.~\eqref{eq:s32_estimate}), so every shape has all descriptors, and the distance of Step~4 (Eq.~\eqref{eq:s4D}) no longer
+  has a special case for missing values.
+  \item Full normalization (Section~\ref{sec:normalization}): Step~3.1 now starts from the resampled shapes of Step~2.3 and
+  applies all four steps, so the shapes are scaled only once.
+\end{itemize}
+
+\textbf{Figures and tables.}
+\begin{itemize}
+  \item Larger figures of the decimation failures, one shape per row (Figures~\ref{fig:s23housesa}--\ref{fig:s23plants}),
+  with the area change in Table~\ref{tab:s23exceptions}.
+  \item Alignment checked for all three axes (Table~\ref{tab:normcheck}, Figure~\ref{fig:normhist}).
+  \item New table of theoretical and measured descriptor ranges (Table~\ref{tab:s32_theory}); volume added to the
+  demonstration figure (Figure~\ref{fig:s32_demo}).
+  \item Shading of the Bird explained, with a comparison of smooth and flat shading (Figure~\ref{fig:birdshading}); the Bird
+  in Figure~\ref{fig:bird} is now shown with flat shading.
+  \item New figure of the orientation conflicts before and after Step~2.3 (Figure~\ref{fig:orientconflicts}).
+\end{itemize}
+
+\textbf{Text.}
+\begin{itemize}
+  \item Exact shading model of the viewer (Section~\ref{sec:design1}); the Hand paragraph now explains that the renderer lights
+  both sides of a face, so orientation is checked numerically (Section~\ref{sec:results1}).
+  \item Exact tests of the mesh problems and the fix for each of them (Section~\ref{sec:s21}, Table~\ref{tab:s22quality}).
+  \item Merging of duplicate vertices, parallel processing (Section~\ref{sec:resampling}), separate translation and scaling in
+  Step~2.5 (Section~\ref{sec:s25}).
+  \item Step~3.1: axis-aligned bounding box, the test procedure for shapes with unclear axes, and the normalization described
+  as projections, mirroring and scaling, which together form a linear map.
+\end{itemize}
 \clearpage
 
 {\small\tableofcontents}
@@ -117,7 +158,8 @@ and prepared before they can be compared.
 Section~\ref{sec:step1} describes how the shapes are read from disk and visualized, and Section~\ref{sec:step2} describes
 the analysis and preprocessing of the shape database. Section~\ref{sec:step3} covers the feature extraction: the full normalization of the shapes
 (Step~3.1) and the computation of the shape descriptors (Step~3.2). Section~\ref{sec:step4} describes how the features are
-normalized and compared to answer queries. Section~\ref{sec:intro} also introduces the
+normalized and compared to answer queries, and Section~\ref{sec:step5} how the search is made faster with a spatial search
+structure and how the whole database is shown in one map. Section~\ref{sec:intro} also introduces the
 mathematical notation (Section~\ref{sec:notation}) and the software that was used (Section~\ref{sec:tools}).
 
 \subsection{Mathematical Notation}\label{sec:notation}
@@ -182,9 +224,10 @@ $\mathrm{Vol}(M)$ & signed volume & \ref{sec:notation}\\
 $V_{\text{target}}$, $[N_{lo},N_{hi}]$ & target vertex count and accepted range of the resampling & \ref{sec:resampling}\\
 $\mathit{flip}$, $\mathit{same}$ & flags of the orientation pass (face reversed, edge listed in the same direction) & \ref{sec:resampling}\\
 $A(M)$ & surface area & \ref{sec:resampling}\\
-$L$, $L_0$ & maximum edge length of the refinement and its starting value & \ref{sec:resampling}\\
+$L$ & maximum edge length of the refinement & \ref{sec:resampling}\\
 $A_t$, $\mu_A$, $\sigma_A$, $\mathrm{CV}(M)$ & area of triangle $t$, mean and standard deviation of the triangle areas, their coefficient of variation & \ref{sec:resampling}\\
 $Q_v$, $\mathbf u$, $s$ & quadric matrix of a vertex and merged vertex (decimation), cell size of the vertex clustering & \ref{sec:resampling}\\
+$M'$, $\Delta_A$ & decimated mesh, relative change of the surface area by the decimation & \ref{sec:resampling}\\
 $\delta_H$, $S_1,S_2$, $P_1,P_2$ & Hausdorff distance, original and resampled surface, random points on them & \ref{sec:resampling}\\
 $\bar v$ & barycenter of the shape (mean of the vertices) & \ref{sec:s25}\\
 $D_x,D_y,D_z$, $D_{\max}$ & sides of the axis-aligned bounding box and the largest side & \ref{sec:s25}\\
@@ -203,9 +246,12 @@ $[r_{\min},r_{\max}]$ & range of a histogram & \ref{sec:descriptors}\\
 $\mathcal{G}$, $\varphi_g(M)$, $\hat\varphi_g(M)$ & set of descriptors, feature values of descriptor $g$ before and after normalization & \ref{sec:s4norm}\\
 $\varphi_g^{\min}$, $\varphi_g^{\max}$, $\mu_g$, $\sigma_g$ & smallest and largest value, mean and standard deviation of descriptor $g$ over the database & \ref{sec:s4norm}\\
 $d_g(M_1,M_2)$, $\rho_g$ & distance of two shapes for descriptor $g$, standard deviation of $d_g$ over pairs of database shapes & \ref{sec:s4dist}\\
-$\mathcal{G}_{12}$, $D(M_1,M_2)$ & descriptors available for both shapes, distance between two shapes & \ref{sec:s4dist}\\
+$D(M_1,M_2)$ & distance between two shapes & \ref{sec:s4dist}\\
 $M_q$, $K$ & query shape, number of returned shapes & \ref{sec:s4compare}\\
 $TP$, $FP$, PPV & returned shapes with and without the class of the query, precision & \ref{sec:s4compare}\\
+$h$, $h'$, $d_{\cos}$, $d_{\mathrm{EMD}}$ & two histograms of the same descriptor, cosine distance and Earth Mover's Distance between them & \ref{sec:s4metrics}\\
+$R$ & radius of a range query & \ref{sec:s5search}\\
+$\mathcal{A}_K$, $\mathcal{E}_K$, $\mathrm{Recall}@K$ & $K$ closest shapes found by the index and by the exact search, share of $\mathcal{E}_K$ found in $\mathcal{A}_K$ & \ref{sec:s5eval}\\
 \bottomrule\end{tabular}
 \caption{Notation used in this report.}\label{tab:notation}
 \end{table}
@@ -227,6 +273,8 @@ Open3D~[9]     & 0.20.0  & standalone viewer, mesh resampling & \url{https://www
 Matplotlib~[10] & 3.11.2 & histograms and plots & \url{https://matplotlib.org}\\
 Tectonic~[11]  & 0.17.0  & compiling this report (LaTeX) & \url{https://tectonic-typesetting.github.io}\\
 SciPy~[12]     & 1.18.1  & convex hulls (Qhull, called by trimesh) & \url{https://scipy.org}\\
+FAISS~[13]     & 1.15.1  & approximate nearest-neighbor search (HNSW) & \url{https://faiss.ai}\\
+scikit-learn~[14] & 1.8.0 & t-SNE & \url{https://scikit-learn.org}\\
 \bottomrule\end{tabular}
 \caption{Software used, with exact versions and sources.}\label{tab:tools}
 \end{table}
@@ -268,9 +316,16 @@ The trimesh library was chosen because it reads OBJ files directly and gives acc
 In addition, a standalone viewer based on Open3D~[9] was written for fast exploration, and Kaleido~[8] was used to export
 rendered views as images.
 
-The surface is displayed with Plotly's \texttt{Mesh3d}. Shading makes the three-dimensional structure easier to see. Smooth
-shading is used, in which the color is interpolated from normals averaged at the vertices, because flat shading of dense meshes
-produces visual artifacts (Section~\ref{sec:results1}). The optional wireframe is drawn from the edges of the faces.
+The surface is displayed with Plotly's \texttt{Mesh3d}. Shading makes the three-dimensional structure easier to see. The
+lighting model of \texttt{Mesh3d} has one point light, placed at $(100,200,150)$ in the coordinates of the scene, and computes
+the brightness of a point from three parts: an ambient part with weight 0.5, which is the same everywhere, a diffuse part with
+weight 0.8, which depends on the angle between the normal and the direction to the light, and a specular highlight with weight
+0.2 and roughness 0.6. All other lighting parameters keep the default values of Plotly. Smooth shading is used: the normal of a
+vertex is the average of the normals $n_j$ (Eq.~\eqref{eq:normal}) of the faces around it, and inside a triangle the shading is
+interpolated from the normals of its three vertices. The renderer lights both sides of a face in the same way, so the image does
+not show whether a normal points outwards or inwards (Section~\ref{sec:results1}). Smooth shading is the default, because flat shading
+of dense meshes produces visual artifacts. On very coarse meshes smooth shading gives unexpected gradients, so the viewer can
+also use flat shading, in which every triangle is shaded with its own normal $n_j$ (Section~\ref{sec:results1}). The optional wireframe is drawn from the edges of the faces.
 
 The viewer supports the following interaction:
 \begin{itemize}
@@ -331,7 +386,7 @@ are analyzed in Section~\ref{sec:step2}.
 \caption{#3}\label{#2}
 \end{figure}}
 \reportfig{Bicycle}{fig:bicycle}{Bicycle (D00016), a mechanical shape with many thin parts: (a) smooth shading, (b) with the wireframe drawn on top.}
-\reportfig{Bird}{fig:bird}{Bird (D00089), the smallest of the six test shapes (233 vertices): (a) smooth shading, (b) with the wireframe drawn on top.}
+\reportfig{Bird}{fig:bird}{Bird (D00089), the smallest of the six test shapes (233 vertices): (a) flat shading, which suits this coarse mesh better than smooth shading (Figure~\ref{fig:birdshading}), (b) with the wireframe drawn on top.}
 \reportfig{Chess}{fig:chess}{Chess piece (D01017), a small rotationally symmetric shape: (a) smooth shading, (b) with the wireframe drawn on top.}
 \reportfig{Hand}{fig:hand}{Hand (D01006), an organic shape with a dense, irregular mesh: (a) smooth shading, (b) with the wireframe drawn on top.}
 \reportfig{House}{fig:house}{House (D00001), an architectural shape with large flat surfaces: (a) smooth shading, (b) with the wireframe drawn on top.}
@@ -339,23 +394,45 @@ are analyzed in Section~\ref{sec:step2}.
 
 \paragraph{Shading of the Hand Shape.}
 With flat shading, in which every triangle receives one color computed from its normal $n_j$, the Hand shows irregular dark
-patches (Figure~\ref{fig:handshading}a). Such patches are typical for inconsistently oriented faces, whose normals point to the
-inside of the surface, so the orientation of the Hand mesh was checked. The mesh is consistently oriented: none of its 23,782 edges is
-traversed in the same direction by its two faces, and its signed volume (Eq.~\eqref{eq:signedvolume}) is positive, which means that the normals point
-outwards. As an additional test, the orientation of every face was reversed; the flat-shaded image remains the same
-(Figure~\ref{fig:handshading}b), so the patches do not depend on the face orientation. They are an artifact of flat shading
-in the renderer for dense meshes with many small triangles. With smooth shading the surface is displayed correctly
-(Figure~\ref{fig:handshading}c), and smooth shading is therefore used for all figures in this report.
+patches (Figure~\ref{fig:handshading}a). Such patches could point to inconsistently oriented faces, so the orientation of the
+Hand mesh was checked numerically. The mesh is consistently oriented: none of its 23,782 edges is traversed in the same direction
+by its two faces, and its signed volume (Eq.~\eqref{eq:signedvolume}) is positive, which means that the normals point outwards.
+When the orientation of every face is reversed, the flat-shaded image stays exactly the same (Figure~\ref{fig:handshading}b).
+This shows that the renderer lights both sides of a face, as if it used $n_j$ or $-n_j$, whichever gives the brighter result.
+A rendered image can therefore not show whether the faces of a mesh are oriented consistently, and the reversed image is no
+evidence about the orientation either. For the Hand, the evidence is the edge test and the signed volume, and the patches are an
+artifact of flat shading in the renderer for dense meshes with many small triangles. With smooth shading the surface is
+displayed correctly (Figure~\ref{fig:handshading}c), and smooth shading is therefore used for the figures in this report, except for the very coarse Bird (see below).
 
-Inconsistent orientation does occur elsewhere in the database: 693 of the 2,483 shapes (28\,\%), including the Bicycle and
-the House of Table~\ref{tab:six}, contain inconsistently oriented faces. These are reoriented during the preprocessing
-(Section~\ref{sec:resampling}).
+Because the renderer hides orientation errors, the orientation of every shape is checked numerically, with the edge test and the
+signed volume (Section~\ref{sec:s21}). Inconsistent orientation does occur elsewhere in the database: 693 of the 2,483 shapes
+(28\,\%), including the Bicycle and the House of Table~\ref{tab:six}, contain inconsistently oriented faces. These are
+reoriented during the preprocessing (Section~\ref{sec:resampling}). The orientation matters later for the volume of a shape,
+because faces that point inwards are subtracted instead of added in Eq.~\eqref{eq:signedvolume}
+(Section~\ref{sec:descriptors}).
+
+\paragraph{Shading of the Bird Shape.}
+With smooth shading, the Bird looks strange in some places: dark gradients run along the edges of the wings and over the
+body (Figure~\ref{fig:birdshading}a). The Bird mesh is closed and consistently oriented, so this is not caused by the
+orientation. It is caused by the smooth shading on a very coarse mesh. The Bird has only 233 vertices, and its wings are thin plates in which the upper and the lower
+side meet at sharp edges. The averaged normal of a vertex on such an edge points in a direction between the two sides, and the
+interpolation then spreads this normal over large triangles, which gives the dark gradients. With flat shading every triangle
+gets the color of its own normal, and the Bird looks as expected (Figure~\ref{fig:birdshading}b). Smooth shading is therefore the
+better choice for dense meshes, such as the Hand, and flat shading for very coarse meshes, and the Bird in
+Figure~\ref{fig:bird} is shown with flat shading. After the resampling of Step~2 all shapes have at least 5,000 vertices, and
+the smooth shading of the later figures does not show this effect.
+
+\begin{figure}[htbp]\centering
+\includegraphics[width=0.9\linewidth]{bird_shading.png}
+\caption{The Bird (D00089, 233 vertices) with (a) smooth shading, where averaged vertex normals at the sharp edges of the thin
+wings give dark gradients, and (b) flat shading, where every triangle is shaded with its own normal.}\label{fig:birdshading}
+\end{figure}
 
 \begin{figure}[htbp]\centering
 \begin{subfigure}{0.32\linewidth}\centering\includegraphics[width=\linewidth]{hand_flat_crop.png}\caption{flat shading}\end{subfigure}\hfill
 \begin{subfigure}{0.32\linewidth}\centering\includegraphics[width=\linewidth]{hand_flat_reversed_crop.png}\caption{flat, all faces reversed}\end{subfigure}\hfill
 \begin{subfigure}{0.32\linewidth}\centering\includegraphics[width=\linewidth]{hand_smooth_crop.png}\caption{smooth shading}\end{subfigure}
-\caption{The Hand shape (D01006): (a) flat shading shows dark patches; (b) the patches stay the same when all faces are reversed, so they are not caused by the face orientation; (c) smooth shading shows the surface correctly.}\label{fig:handshading}
+\caption{The Hand shape (D01006): (a) flat shading shows dark patches; (b) the image stays the same when all faces are reversed, because the renderer lights both sides of a face, so an image cannot show the orientation; (c) smooth shading shows the surface correctly.}\label{fig:handshading}
 \end{figure}
 
 \subsection{Discussion}
@@ -365,7 +442,9 @@ exactly the same data.
 
 Testing with shapes of very different size and structure was useful, because the database varies strongly in mesh resolution
 and complexity: the six test shapes alone range from 233 to 54,223 vertices. A single simple model would not have revealed
-problems such as the shading artifacts of the Hand, which only appear for dense meshes with many small triangles.
+problems such as the shading artifacts of the Hand, which only appear for dense meshes with many small triangles, or the
+gradients on the coarse Bird. The tests also showed that the renderer lights both sides of every face, so the orientation of the
+faces has to be checked with numbers and not by looking at images.
 
 The viewer works on triangulated data, so the original face type cannot be read from the loaded mesh. For the analysis of the
 database it is therefore determined from the OBJ files directly (Section~\ref{sec:loading}). In the same way, a successful load
@@ -374,8 +453,8 @@ faces have to be detected separately, which is done in Section~\ref{sec:step2}.
 
 \subsection{Conclusion}
 The application loads OBJ meshes with trimesh and displays them interactively with Plotly. It supports shaded rendering with an
-optional wireframe, together with rotation, zooming and panning. Smooth shading is used, because flat shading produced
-misleading artifacts on dense meshes.
+optional wireframe, together with rotation, zooming and panning. Smooth shading is used by default, because flat shading
+produced misleading artifacts on dense meshes, and flat shading is used for very coarse meshes such as the Bird.
 
 The viewer was tested on six shapes from different classes, from small meshes such as the Bird and the Chess piece to much
 larger meshes such as the House and the Tree, and the loader reads all 2,483 shapes of the database without errors. The
@@ -440,12 +519,19 @@ Tree    & D00096 & 54,223 & 36,512 & triangles & $-0.671$ & $-0.373$ & $-0.334$ 
 axis-aligned bounding box.}\label{tab:s21}
 \end{table}
 
-Besides these values, the tool also measures properties that tell how clean a mesh is. Vertices with exactly the same
-coordinates are counted as duplicates. A triangle is called degenerate if two of its corners are the same vertex or if its area
-is practically zero ($\le 10^{-12}\,d(M)^2$). Every edge is counted with the number of faces that contain it: an edge in one face
-is a boundary edge, an edge in two faces is a normal (manifold) edge and an edge in three or more faces is non-manifold. A mesh is
-closed if it has no boundary and no non-manifold edges. Finally, two neighboring faces have an orientation conflict if they
-list their shared edge in the same direction (Section~\ref{sec:notation}).
+Besides these values, the tool also measures properties that tell how clean a mesh is. Each of them is found with an exact test
+on the vertex and face lists. Duplicate vertices are found by sorting all vertex positions and grouping the ones with exactly
+the same coordinates; every group with more than one vertex counts as duplicates. Unused vertices are vertices whose index does
+not appear in any face. For the remaining tests the duplicates are first replaced by one vertex, because the edges of two faces
+can only be matched when the faces use the same vertex indices. A triangle is called degenerate if two of its corners are the
+same vertex or if its area is practically zero ($\le 10^{-12}\,d(M)^2$). Every edge, stored as the pair of its two vertex
+indices in sorted order, is counted with the number of faces that contain it: an edge in one face is a boundary edge, an edge in
+two faces is a normal (manifold) edge and an edge in three or more faces is non-manifold. A mesh is closed if it has no boundary
+and no non-manifold edges. Two faces that share an edge have an orientation conflict if they list this edge in the same
+direction (Section~\ref{sec:notation}); this is tested for every edge with exactly two faces. Finally, a connected part that is
+consistently oriented can still be inside-out as a whole, which the edge test cannot see. The faces are therefore made
+consistent per connected part, and a part that is closed and has a negative signed volume (Eq.~\eqref{eq:signedvolume}) is
+counted as inside-out. Each of these tests is also used in Step~2.3 to fix the problem it finds (Table~\ref{tab:s22quality}).
 
 \subsection{Step 2.2: Statistics over the Whole Database}\label{sec:s22}
 The analysis tool was run on all 2,483 shapes and the results were saved in one table (CSV file) with one row per shape. All
@@ -486,7 +572,7 @@ partly measure how finely a class was modeled instead of the shape itself.
 sorted by size. The lines in the bottom plot mark 5,000 and 10,000 vertices.}\label{fig:s22classes}
 \end{figure}
 
-\paragraph{Outliers.} Two definitions of an outlier were used. The first is Tukey's rule~[13] on the vertex counts, which marks a
+\paragraph{Outliers.} Two definitions of an outlier were used. The first is Tukey's rule~[15] on the vertex counts, which marks a
 shape as an outlier if $N_V > Q_3 + 1.5\,(Q_3-Q_1)$, with $Q_1$ and $Q_3$ the first and third quartile. This gives an upper limit
 of 15,032 vertices and marks 247 shapes (9.9\,\%) as large outliers, mostly from the classes Car (23), PlantIndoors (21),
 Tree (17), Bicycle (13) and Humanoid (11). The lower limit is negative, so there are no small outliers in this sense. The second
@@ -507,17 +593,18 @@ meshes are cleaned and reoriented before they are resampled (Section~\ref{sec:re
 a volume will only be well defined for a minority of the shapes, which has to be taken into account in Step~3.
 
 \begin{table}[htbp]\centering\small
-\begin{tabular}{@{}lrr@{}}\toprule
-Problem & Shapes & \%\\\midrule
-orientation conflicts & 693 & 27.9\\
-closed part that is inside-out (negative signed volume) & 375 & 15.1\\
-duplicate vertices & 698 & 28.1\\
-unused vertices & 71 & 2.9\\
-degenerate triangles & 454 & 18.3\\
-non-manifold edges & 1,350 & 54.4\\
-not closed (boundary or non-manifold edges) & 2,003 & 80.7\\
+\begin{tabular}{@{}p{0.36\linewidth}rrp{0.40\linewidth}@{}}\toprule
+Problem & Shapes & \% & Fix in Step~2.3 (Section~\ref{sec:resampling})\\\midrule
+orientation conflicts & 693 & 27.9 & orientation walk over the faces\\
+closed part that is inside-out (negative signed volume) & 375 & 15.1 & part turned inside-out as a whole\\
+duplicate vertices & 698 & 28.1 & merged into one vertex\\
+unused vertices & 71 & 2.9 & removed\\
+degenerate triangles & 454 & 18.3 & removed\\
+non-manifold edges & 1,350 & 54.4 & not fixed, kept\\
+not closed (boundary or non-manifold edges) & 2,003 & 80.7 & not fixed; holes filled for the volume in Step~3.2\\
 \bottomrule\end{tabular}
-\caption{Number and percentage of the 2,483 original shapes that have each kind of mesh problem.}\label{tab:s22quality}
+\caption{Number and percentage of the 2,483 original shapes that have each kind of mesh problem, and how the problem is
+treated in Step~2.3.}\label{tab:s22quality}
 \end{table}
 
 \subsection{Step 2.3: Resampling}\label{sec:resampling}
@@ -532,8 +619,9 @@ the extreme shapes (fewer than 100 or more than 100,000 vertices) was also consi
 leave resolutions between 100 and 98,000 vertices in the database, which is too much variation for the descriptors of Step~3.
 
 \paragraph{Cleaning.} First, vertices with exactly the same coordinates are merged, i.e. $v_i$ and $v_k$ become one vertex if
-$v_i=v_k$. Without this, neighboring faces that use different copies of the same point are not connected, and the decimation
-cannot work across these seams. Then degenerate triangles (two equal corners, or area $A_t\le10^{-12}\,d(M)^2$), duplicated
+$v_i=v_k$. Without this, two neighboring faces that use different copies of the same point do not share an edge in the face
+list, although they touch in space. The mesh then looks open along such a seam, the orientation walk described below cannot
+cross it, and the decimation may collapse the two sides of the seam separately, which can open small cracks along it. Then degenerate triangles (two equal corners, or area $A_t\le10^{-12}\,d(M)^2$), duplicated
 faces and unused vertices are removed. Cleaning was needed for a large part of the database:
 698 shapes had duplicate vertices (1,438,321 vertices were merged in total), 917 had duplicated faces, 454 had degenerate
 triangles and 71 had unused vertices.
@@ -551,25 +639,37 @@ vertex order reversed. After that, every connected part that is closed or almost
 or non-manifold edge) and has a negative signed volume~\eqref{eq:signedvolume} is turned inside-out as a whole, so that its
 normals point outwards. For open parts the sign of the volume has no meaning, so they are left as they are. Because the decimation can
 create new conflicts, the same orientation pass is run again at the end. After cleaning, 882 shapes had orientation conflicts;
-after the final pass 63 shapes are left. They contain folded or non-orientable parts that cannot be fixed this way, so they are
-kept but marked in the log.
+after the final pass 66 shapes are left. They contain folded or non-orientable parts that cannot be fixed this way, so they are
+kept but marked in the log. Because the renderer lights both sides of a face (Section~\ref{sec:results1}), the conflicts
+cannot be seen in a normal image. Figure~\ref{fig:orientconflicts} therefore colors the faces that have a conflict with a
+neighbor red, for a car before and after the orientation pass: 11,029 faces have a conflict after cleaning and none after
+Step~2.3.
+
+\begin{figure}[htbp]\centering
+\includegraphics[width=\linewidth]{orientation_conflicts.png}
+\caption{Car m1558 with the faces that list a shared edge in the same direction as their neighbor shown in red: after
+cleaning, before the orientation pass (left), and after Step~2.3 (right).}\label{fig:orientconflicts}
+\end{figure}
 
 \paragraph{Refinement.} Shapes with fewer than 5,000 vertices are refined by splitting long edges. Every edge that is longer than
 a length $L$ is split in the middle, and every triangle is divided according to how many of its edges were split, keeping its
 orientation. This is repeated until no edge is longer than $L$. Because only long edges are split, large triangles are refined and
-small ones are left alone, which makes the triangle sizes more even. If the surface with area $A(M)$ were covered by equilateral
-triangles with edge length $L$, it would have about $4A(M)/(\sqrt3L^2)$ triangles and half as many vertices. This gives the
-starting value
+small ones are left alone, which makes the triangle sizes more even. The length $L$ starts at the length of the longest edge of
+the mesh and is made smaller step by step:
 \begin{equation}
-  L_0 = 1.4\sqrt{\frac{4A(M)}{\sqrt3\cdot 2\,V_{\text{target}}}},
+  L \leftarrow L/1.1 .
   \label{eq:refineL}
 \end{equation}
-where the factor 1.4 compensates for the fact that after splitting the edges are between $L/2$ and $L$ long. Since $N_V$ grows
-with $1/L^2$, the length is corrected after each attempt with $L \leftarrow L\sqrt{N_V/V_{\text{target}}}$, and the refinement is
-started again from the cleaned mesh, at most eight times. The result in the accepted range that is closest to $V_{\text{target}}$
-is kept.
+After every step all edges longer than $L$ are split, and this continues until $N_V$ is larger than $V_{\text{target}}$ for the
+first time. Of this last result and the one before it, the one whose vertex count is closer to $V_{\text{target}}$ is kept. The
+number of steps is therefore not fixed in advance but follows from the shape: a mesh with a few very long edges needs more steps
+than a mesh whose edges all have a similar length. For the refined shapes the number of steps lies between 3 and 47, with a
+median of 28. Because $N_V$ grows roughly with $1/L^2$, one step usually adds about 20\,\% vertices, and 85\,\% of the refined
+shapes end within 10\,\% of $V_{\text{target}}$. Meshes whose edges all have almost the same length, such as a box made of
+equal triangles, can jump further in one step, because all their edges are split at once; the refined shapes end between 5,121
+and 9,953 vertices, so all of them are in the accepted range.
 
-\paragraph{Decimation.} Shapes with more than 10,000 vertices are simplified with quadric error metric decimation~[14] from
+\paragraph{Decimation.} Shapes with more than 10,000 vertices are simplified with quadric error metric decimation~[16] from
 Open3D~[9]. The same is done for the few refined shapes that end above 10,000 vertices. Every vertex gets a matrix $Q_v=\sum_p \mathbf p\mathbf p^{\mathsf T}$, summed over the planes
 $\mathbf p=(a,b,c,d)$ of its neighboring triangles. The method repeatedly merges the two end points of the edge with the lowest
 cost
@@ -580,40 +680,71 @@ cost
 where $\mathbf u$ is the new merged vertex in homogeneous coordinates. The edge with the lowest cost is the one whose removal
 changes the surface least.
 This is repeated until a given number of triangles is left. The number of triangles is corrected up to five times until the vertex
-count is within 10\,\% of $V_{\text{target}}$. To make sure that the decimation does not destroy a shape, every result is compared with the original
-surface using the Hausdorff distance, i.e. the largest distance between a point on one surface and the closest point on the other.
-It is estimated from random points on both surfaces:
+count is within 10\,\% of $V_{\text{target}}$.
+
+\paragraph{Check of the decimation.} The decimation can destroy a shape, for example when it removes thin walls or loose parts
+(see below). Every decimated mesh $M'$ is therefore compared with the cleaned mesh $M$ by the relative change of the surface
+area,
+\begin{equation}
+  \Delta_A=\frac{\lvert A(M')-A(M)\rvert}{A(M)},
+  \label{eq:areachange}
+\end{equation}
+which costs only one sum over the triangles. A result is accepted if it is in the range of 5,000 to 10,000 vertices and
+$\Delta_A\le 30\,\%$. Otherwise two other methods are tried: quadric decimation with a higher weight on the boundary edges, and
+vertex clustering~[17], which puts a grid with cell size $s$ over the shape and replaces all vertices in one grid cell by their
+average. The cell size $s$ is found by bisection so that the vertex count is close to $V_{\text{target}}$. The methods are tried
+in this order, and the first accepted result is used. If none of them is accepted, the result inside the range with the smallest
+$\Delta_A$ is kept. The area was chosen and not the volume, because the volume is only defined for closed meshes, which are a
+minority of the database (Table~\ref{tab:s22quality}). The limit of 30\,\% lies between the area changes of normal decimations
+(median 0.1\,\%, 95\,\% of them below 22\,\%) and those of the failed decimations described below (39 to 72\,\%).
+
+\paragraph{Measuring the quality.} To report how much the resampling moves the surface, every result is also compared with the
+cleaned mesh using the Hausdorff distance, i.e. the largest distance between a point on one surface and the closest point on
+the other. It is estimated from random points on both surfaces:
 \begin{equation}
   \delta_H = \frac{1}{d(M)}\,\max\Big(\max_{p\in P_1}\,\min_{q\in S_2}\lVert p-q\rVert,\;\max_{p\in P_2}\,\min_{q\in S_1}\lVert p-q\rVert\Big),
   \label{eq:hausdorff}
 \end{equation}
-where $S_1$ and $S_2$ are the original and the decimated surface, $P_1$ and $P_2$ are 20,000 random points on them and $d(M)$ is
-the bounding-box diagonal. Because only sample points are used, $\delta_H$ is an estimate of the exact Hausdorff distance. A result is accepted if it is in the range of 5,000 to 10,000 vertices and $\delta_H\le 5\,\%$.
-Otherwise two other methods are tried: quadric decimation with a higher weight on the boundary edges, and vertex clustering~[15],
-which puts a grid with cell size $s$ over the shape and replaces all vertices in one grid cell by their average. The cell size
-$s$ is found by bisection so that the vertex count is close to $V_{\text{target}}$. The methods are tried in this order, and the
-first accepted result is used. If none of them is accepted, the result inside the range with the smallest $\delta_H$ is kept.
+where $S_1$ and $S_2$ are the original and the resampled surface, $P_1$ and $P_2$ are 20,000 random points on them and $d(M)$ is
+the bounding-box diagonal. The points are spread over the surface in proportion to the triangle areas, and not taken from the
+vertices, so that a wall that was removed by the decimation is still sampled on the original surface. For every point the exact
+distance to the nearest triangle of the other surface is computed with the ray-casting scene of Open3D~[9], which uses a
+spatial search structure. Because only sample points are used, $\delta_H$ is an estimate of the exact Hausdorff distance;
+20,000 points per surface are enough to place several points on every part larger than about 1\,\% of the surface. On 30
+random decimated shapes the measurement took 0.07~seconds per shape (median, at most 0.14~seconds), and on the ten largest
+decimated meshes (52,000 to 73,000 vertices) at most 0.13~seconds. $\delta_H$ is only used to describe the results and not to accept or reject them.
 
 \paragraph{Reduced database.} As suggested in the assignment, the method was first developed on a reduced, balanced database
 before it was run on all shapes. This database contains three random shapes of every class (207 shapes), plus the five smallest
 and the five largest shapes of the whole database as extra difficult cases, so 217 shapes in total. All 217 shapes ended in the
-range of 5,000 to 10,000 vertices (mean 7,528, standard deviation 764). On this database, the edge-splitting refinement was also
+range of 5,000 to 10,000 vertices (mean 7,461, standard deviation 736). On this database, the edge-splitting refinement was also
 compared with a simpler method that splits every triangle into four until the target is passed and then decimates back to the
 target. The simpler method made the triangle sizes less even (median CV from 2.31 to 6.12, see Eq.~\eqref{eq:cv}), while the
-edge-splitting refinement made them more even (median CV 0.88), so the edge-splitting refinement was used.
+edge-splitting refinement made them more even (median CV 0.86), so the edge-splitting refinement was used.
 
-\paragraph{Results.} All 2,483 shapes were processed without errors, in about 6.5 minutes on 8 processor cores. 1,754 shapes
-were refined, 362 decimated and 367 kept. All shapes now have between 5,010 and 9,961 vertices, with a mean of 7,506
+\paragraph{Parallel processing.} The shapes do not depend on each other, so the whole processing of one shape (reading,
+cleaning, orientation, resampling, measuring and writing) runs as one task, and several tasks run at the same time in separate
+worker processes, one shape per process. Nothing inside the processing of a single shape is parallel. The same is done in
+Steps~2.4, 3.1 and~3.2. The number of worker processes only changes the running time and not the results; it was set to 8 for
+Step~2.3, 4 for Steps~2.4 and~3.1 and 6 for Step~3.2, because the laptop used has 7.7\,GB of memory and more processes ran out of
+memory in the steps that keep larger meshes or many samples in memory.
+
+\paragraph{Results.} All 2,483 shapes were processed without errors, in about 4 minutes with 8 worker processes. 1,754 shapes
+were refined, 362 decimated and 367 kept. All shapes now have between 5,016 and 9,961 vertices, with a mean of 7,441
 (Table~\ref{tab:s23results}). No shape had to be removed, so the classes still contain 15 to 143 shapes. The refinement hardly
-moves the surface (largest $\delta_H = 0.09\,\%$) and makes the triangle sizes more even. The decimation moves the surface
-only a little: $\delta_H$ is below 2.3\,\% for 95\,\% of the decimated shapes and at most 4.7\,\%.
+moves the surface (largest $\delta_H = 0.11\,\%$) and makes the triangle sizes more even. The final result comes from quadric
+decimation for 354 shapes, from quadric decimation with boundary weight for 2 and from vertex clustering for 17. For two trees
+(D00479 and D00777) none of the three results stayed within 30\,\% area change, so the one with the smallest change was kept;
+for all other decimated shapes the result passed the area check. For most decimated shapes the surface
+moves only a little: $\delta_H$ is below 2.2\,\% for 95\,\% of them. Two shapes, discussed below, keep a larger deviation of
+6.3 and 8.6\,\%.
 
 \begin{table}[htbp]\centering\small
 \begin{tabular}{@{}lrrrrrrr@{}}\toprule
 $N_V$ & mean & std.\ dev. & min & 25\,\% & median & 75\,\% & max\\\midrule
 original        & 5,610 & 9,851 & 16    & 490   & 1,826 & 6,306 & 98,256\\
 after cleaning  & 5,019 & 8,144 & 16    & 480   & 1,724 & 6,072 & 73,440\\
-after resampling & 7,506 & 779  & 5,010 & 7,200 & 7,591 & 7,960 & 9,961\\
+after resampling & 7,441 & 747  & 5,016 & 7,156 & 7,502 & 7,784 & 9,961\\
 \bottomrule\end{tabular}
 \caption{Number of vertices of all 2,483 shapes in the original files, after cleaning and after resampling.}\label{tab:s23results}
 \end{table}
@@ -622,35 +753,66 @@ after resampling & 7,506 & 779  & 5,010 & 7,200 & 7,591 & 7,960 & 9,961\\
 (Table~\ref{tab:s23exceptions}). Four Houses are scenes made of thousands of separate parts (roof tiles, walls and a ground plate).
 For three of them the decimation removed the walls and the ground plate and left only the roof, and for the fourth it removed the
 ground plate; the surface moved by 13 to 19\,\% of the diagonal. The PlantIndoors and Tree shapes consist of thousands of small
-loose leaves, and the decimation could not reach the target range. These cases are the reason why the Hausdorff check and the two
-other methods were added. With them, all six shapes are in the accepted range and none moves by more than 4.5\,\%
-(Figures~\ref{fig:s23houses} and~\ref{fig:s23plants}).
+loose leaves, and the decimation removed most of them and could not reach the target range. In all six cases the surface area
+dropped by 39 to 72\,\%, so the area check rejects them, and the other two methods are tried. With them, all six shapes are in
+the accepted range, their area changes by at most 7\,\% and none moves by more than 4.5\,\%
+(Figures~\ref{fig:s23housesa}--\ref{fig:s23plants}). Vertex clustering keeps loose parts in place, because every part stays
+within about one grid cell, while quadric decimation can merge a small part into a single point.
 
-\begin{table}[htbp]\centering\small
-\begin{tabular}{@{}lrrrlrr@{}}\toprule
- & & \multicolumn{2}{c}{quadric only} & \multicolumn{3}{c}{final result}\\\cmidrule(lr){3-4}\cmidrule(l){5-7}
-Shape & $N_V$ cleaned & $N_V$ & $\delta_H$ (\%) & method & $N_V$ & $\delta_H$ (\%)\\\midrule
-House D00286        & 28,394 & 11,130 & 18.6 & vertex clustering & 7,533 & 0.5\\
-House D00901        & 17,182 & 11,136 & 18.5 & vertex clustering & 7,326 & 0.3\\
-House D00574        & 15,615 & 7,199  & 16.1 & vertex clustering & 7,473 & 0.8\\
-House D00903        & 28,000 & 8,761  & 12.9 & vertex clustering & 7,293 & 1.2\\
-PlantIndoors D00080 & 64,126 & 3,144  & 7.0  & vertex clustering & 7,397 & 4.5\\
-Tree D00765         & 29,924 & 2,863  & 3.7  & quadric, boundary weight & 7,122 & 2.4\\
+\begin{table}[htbp]\centering\small\setlength{\tabcolsep}{4pt}
+\begin{tabular}{@{}lrrrrlrrr@{}}\toprule
+ & & \multicolumn{3}{c}{quadric only} & \multicolumn{4}{c}{final result}\\\cmidrule(lr){3-5}\cmidrule(l){6-9}
+Shape & $N_V$ cleaned & $N_V$ & $\Delta_A$ (\%) & $\delta_H$ (\%) & method & $N_V$ & $\Delta_A$ (\%) & $\delta_H$ (\%)\\\midrule
+House D00286        & 28,394 & 11,130 & 72 & 18.6 & vertex clustering & 7,533 & 6.3 & 0.5\\
+House D00901        & 17,182 & 11,136 & 72 & 18.5 & vertex clustering & 7,326 & 6.9 & 0.3\\
+House D00574        & 15,615 & 7,199  & 59 & 16.1 & vertex clustering & 7,473 & 4.9 & 0.8\\
+House D00903        & 28,000 & 8,761  & 54 & 12.9 & vertex clustering & 7,293 & 6.5 & 1.2\\
+PlantIndoors D00080 & 64,126 & 3,144  & 39 & 7.0  & vertex clustering & 7,397 & 3.8 & 4.5\\
+Tree D00765         & 29,924 & 2,863  & 56 & 3.7  & quadric, boundary weight & 7,122 & 5.4 & 2.4\\
 \bottomrule\end{tabular}
-\caption{The six shapes for which quadric decimation alone fails: vertex count and Hausdorff distance after quadric decimation,
-and method, vertex count and Hausdorff distance of the final result.}\label{tab:s23exceptions}
+\caption{The six shapes for which quadric decimation alone fails: vertex count, area change and Hausdorff distance after quadric
+decimation, and method, vertex count, area change and Hausdorff distance of the final result.}\label{tab:s23exceptions}
 \end{table}
 
 \begin{figure}[htbp]\centering
-\includegraphics[width=0.62\linewidth]{exceptions_houses.png}
-\caption{The four House shapes of Table~\ref{tab:s23exceptions}: cleaned original (left), result of quadric decimation alone
-(middle) and final result with vertex clustering (right).}\label{fig:s23houses}
+\includegraphics[width=\linewidth]{exceptions_houses_a.png}
+\caption{House D00286 and House D00901 of Table~\ref{tab:s23exceptions}: cleaned original (left), result of quadric
+decimation alone (middle) and final result with vertex clustering (right). For both houses, quadric decimation keeps only the
+roof and removes the walls and the ground plate. D00286 is stored upside down in its file; the shapes are only aligned in
+Step~3.1.}\label{fig:s23housesa}
 \end{figure}
 
 \begin{figure}[htbp]\centering
-\includegraphics[width=0.62\linewidth]{exceptions_plant_tree.png}
-\caption{PlantIndoors D00080 and Tree D00765: cleaned original (left), result of quadric decimation alone (middle) and final
-result (right).}\label{fig:s23plants}
+\includegraphics[width=\linewidth]{exceptions_houses_b.png}
+\caption{House D00574 and House D00903 of Table~\ref{tab:s23exceptions}: cleaned original (left), result of quadric
+decimation alone (middle) and final result with vertex clustering (right). For D00574, quadric decimation again keeps only the
+roof. For D00903 it fails in a different way: the walls stay but are torn into large triangles, and the ground plate is
+removed.}\label{fig:s23housesb}
+\end{figure}
+
+\begin{figure}[htbp]\centering
+\includegraphics[width=\linewidth]{exceptions_plant_tree.png}
+\caption{PlantIndoors D00080 and Tree D00765: cleaned original (left), result of quadric decimation alone, which loses most of
+the leaves (middle), and final result (right).}\label{fig:s23plants}
+\end{figure}
+
+\paragraph{Limit of the area check.} The area check is much cheaper than a geometric comparison of the two surfaces, but it
+does not see every kind of damage. Two shapes end with a surface that moved more than for the other decimated shapes
+(Figure~\ref{fig:s23twoshapes}). For the Skyscraper D00058, quadric decimation keeps the outer walls but opens holes in the
+facade and adds a few long, thin triangles; the area changes by only 16\,\%, but $\delta_H$ is 8.6\,\%. For the Tree D00479,
+all three methods lose part of the leaves and change the area by more than 30\,\%, so the result with the smallest area change
+(39\,\%) is kept, which is the quadric decimation with $\delta_H=6.3\,\%$. For both shapes vertex clustering would have moved
+the surface less (0.4 and 2.3\,\%). A geometric check such as the Hausdorff distance would catch these cases, but it has to be
+computed for every candidate result of every decimated shape, with 40,000 sample points and a search structure over the
+original mesh. This costs much more computation than one sum over the triangles, and with several worker processes running at
+the same time it also needs much more memory, which was the limiting resource on the laptop used (see the paragraph on
+parallel processing). Because of these limited computing resources (Section~\ref{sec:intro}), the area check was used, and the two shapes are kept with their larger deviation. Their overall form
+is still recognizable, so the effect on the descriptors of Step~3 is expected to be small.
+
+\begin{figure}[htbp]\centering
+\includegraphics[width=\linewidth]{area_check_two_shapes.png}
+\caption{The two shapes that keep a larger Hausdorff distance after the decimation: cleaned original (left), result of vertex
+clustering, which was not chosen by the area check (middle), and final result with quadric decimation (right).}\label{fig:s23twoshapes}
 \end{figure}
 
 \subsection{Step 2.4: Checking the Resampling}\label{sec:s24}
@@ -665,8 +827,8 @@ Figure~\ref{fig:s24hist} compares the distributions before and after the resampl
 Measure & Minimum & Maximum\\\midrule
 Original vertices & 16 & 98,256\\
 Vertices after cleaning & 16 & 73,440\\
-Vertices after resampling & 5,010 & 9,961\\
-Faces after resampling & 2,842 & 20,270\\
+Vertices after resampling & 5,016 & 9,961\\
+Faces after resampling & 3,271 & 24,999\\
 \bottomrule\end{tabular}
 \caption{Smallest and largest mesh sizes before and after the resampling.}\label{tab:s24ranges}
 \end{table}
@@ -675,23 +837,24 @@ Faces after resampling & 2,842 & 20,270\\
 \includegraphics[width=\linewidth]{step2_4_histograms.png}
 \caption{Original (outline) and resampled (filled) database: (a) number of vertices, with the target range marked in green,
 (b) number of faces, (c) coefficient of variation of the triangle areas, where 0 means that all triangles of a shape have the
-same area. Values of 6 and more are collected in the last bin of (c).}\label{fig:s24hist}
+same area. Values of 6 and more are collected in the last bin of (c). The target of the resampling is 7,500 vertices, the
+middle of the range of 5,000 to 10,000, so the resampled shapes are centered around 7,500 and not around 10,000.}\label{fig:s24hist}
 \end{figure}
 
-All 2,483 shapes are in the target range, with a mean of 7,506 vertices and a standard deviation of 779 (9,851 before). The
-number of faces has a mean of 14,429 and a standard deviation of 2,102. To see whether the triangles also became more even, the
+All 2,483 shapes are in the target range, with a mean of 7,441 vertices and a standard deviation of 747 (9,851 before). The
+number of faces has a mean of 14,322 and a standard deviation of 1,997. To see whether the triangles also became more even, the
 coefficient of variation of the triangle areas,
 \begin{equation}
   \mathrm{CV}(M)=\frac{\sigma_A}{\mu_A},
   \label{eq:cv}
 \end{equation}
 was computed for every shape, where $\mu_A$ and $\sigma_A$ are the mean and the standard deviation of the triangle areas $A_t$.
-The median CV went down from 2.46 to 1.06, so the triangle sizes are clearly more even after the resampling
+The median CV went down from 2.46 to 1.09, so the triangle sizes are clearly more even after the resampling
 (Figure~\ref{fig:s24hist}c). The decimated shapes improve less than the refined ones, because quadric decimation keeps the shape
 and not the triangle size.
 
 For the visual check, three shapes were opened in the viewer before and after the resampling: a refined, a decimated and a kept
-shape (Figure~\ref{fig:s24viewer}). The Bird is refined from 233 to 7,452 vertices and keeps its shape, but its triangles are now
+shape (Figure~\ref{fig:s24viewer}). The Bird is refined from 233 to 8,047 vertices and keeps its shape, but its triangles are now
 much smaller. The Humanoid is decimated from 11,806 to 7,559 vertices; the mesh is coarser, but the arms, legs and fingers are still
 there. The balloon (AircraftBuoyant m1338) already had 8,761 vertices and is the same before and after. The processing log and the
 statistics were saved as a print-out (CSV and text files), as asked in the assignment.
@@ -703,22 +866,24 @@ statistics were saved as a print-out (CSV and text files), as asked in the assig
 \begin{subfigure}{0.32\linewidth}\centering\includegraphics[width=\linewidth]{Bird_refined_wireframe.png}\caption{Bird, after (refined)}\end{subfigure}\hfill
 \begin{subfigure}{0.32\linewidth}\centering\includegraphics[width=\linewidth]{Humanoid_refined_wireframe.png}\caption{Humanoid, after (decimated)}\end{subfigure}\hfill
 \begin{subfigure}{0.32\linewidth}\centering\includegraphics[width=\linewidth]{Kept_refined_wireframe.png}\caption{Balloon, after (kept)}\end{subfigure}
-\caption{Viewer check of the resampling with the wireframe shown: Bird D00089 (233 $\rightarrow$ 7,452 vertices), Humanoid m253
+\caption{Viewer check of the resampling with the wireframe shown: Bird D00089 (233 $\rightarrow$ 8,047 vertices), Humanoid m253
 (11,806 $\rightarrow$ 7,559 vertices) and AircraftBuoyant m1338 (8,761 vertices, unchanged).}\label{fig:s24viewer}
 \end{figure}
 
 \subsection{Step 2.5: Translation and Scale Normalization}\label{sec:s25}
-After the resampling, the meshes were normalized so that their position and size do not influence later comparisons. First, the
-mean of all vertex positions was calculated and subtracted from each vertex. This places the barycenter at the origin. Second,
-the largest side of the axis-aligned bounding box was scaled to one. The same scale factor is used for all three axes, so the
-proportions of the shape do not change.
+After the resampling, the meshes are normalized so that their position and size do not influence later comparisons. The
+assignment asks for two separate operations in this step, a translation and a scaling, which are described one after the other.
+Both only move the vertices and do not change which vertices form a face, so the faces are kept unchanged.
 
-For a mesh with vertices $v_i$, the barycenter is
+\paragraph{Translation.} For a mesh with vertices $v_i$, the barycenter is the mean of the vertex positions,
 \begin{equation}
-\bar{v}=\frac{1}{N_V}\sum_{i=1}^{N_V}v_i.
+\bar{v}=\frac{1}{N_V}\sum_{i=1}^{N_V}v_i,
 \label{eq:step2barycenter}
 \end{equation}
-The vertices are first moved by $v_i\leftarrow v_i-\bar{v}$. The sides of the bounding box of the moved mesh are
+and every vertex is moved by $v_i\leftarrow v_i-\bar{v}$. After this, the barycenter is at the origin. This is checked by
+computing $\lVert\bar v\rVert$ again on the saved mesh, which should be zero up to rounding errors.
+
+\paragraph{Scaling.} The sides of the axis-aligned bounding box of the moved mesh are
 \begin{equation}
 D_x=x_{\max}-x_{\min},\qquad
 D_y=y_{\max}-y_{\min},\qquad
@@ -730,14 +895,16 @@ The largest side is $D_{\max}=\max(D_x,D_y,D_z)$, and every vertex is scaled by
 v_i\leftarrow\frac{v_i}{D_{\max}}.
 \label{eq:step2normalization}
 \end{equation}
-After this, the barycenter is at the origin (up to rounding errors) and the largest side of the bounding box is one; the other two
-sides are at most one. Translation and scaling do not change which vertices form a face, so the faces are kept unchanged. Note
-that the shape fits in a cube of side one, but this cube does not have to be centered at the origin, because the barycenter is
-usually not the middle of the bounding box.
+The same factor is used for all three axes, so the proportions of the shape do not change. A scaling around the origin does not
+move the barycenter, so the translation stays correct. Afterwards the largest side of the bounding box is one and the other two
+sides are at most one. This is checked by computing $D_{\max}$ again on the saved mesh. Note that the shape fits in a cube of
+side one, but this cube does not have to be centered at the origin, because the barycenter is usually not the middle of the
+bounding box.
 
-The normalized meshes were saved in a separate folder. To verify the result, all output files were read again and the distance of
-the barycenter to the origin, the largest bounding-box side and the number of faces were checked for every shape
-(Table~\ref{tab:step2normalization}). Figure~\ref{fig:step2birdnormalized} shows the Bird after the normalization.
+\paragraph{Verification.} The normalized meshes were saved in a separate folder. All output files were read again, and the
+distance of the barycenter to the origin, the largest bounding-box side and the number of faces were checked for every shape
+(Table~\ref{tab:step2normalization}). Figure~\ref{fig:step2birdnormalized} shows the Bird after the normalization. The same two
+formulas are used again in the full normalization of Step~3.1 (Section~\ref{sec:normalization}).
 
 \begin{table}[htbp]\centering\small
 \begin{tabular}{@{}lr@{}}\toprule
@@ -746,8 +913,8 @@ Input meshes & 2,483\\
 Normalized OBJ files & 2,483\\
 Shapes passing all checks & 2,483\\
 Shapes failing & 0\\
-Mean distance of the barycenter to the origin & $2.03\times10^{-14}$\\
-Largest distance of the barycenter to the origin & $4.09\times10^{-13}$\\
+Mean distance of the barycenter to the origin & $1.97\times10^{-14}$\\
+Largest distance of the barycenter to the origin & $3.49\times10^{-13}$\\
 Largest bounding-box side (minimum / maximum) & 1.0000000000 / 1.0000000000\\
 Face counts unchanged & yes, for all shapes\\
 \bottomrule\end{tabular}
@@ -767,23 +934,27 @@ The analysis showed that the database is very mixed. The shapes have between 16 
 and 143 shapes, and many meshes have problems such as duplicate vertices, orientation conflicts or holes. Only about one fifth of
 the shapes are closed surfaces.
 
-After the preprocessing, all 2,483 shapes have between 5,010 and 9,961 vertices and no shape was lost. The refinement hardly
-moves the surface (at most 0.09\,\% of the diagonal) and makes the triangles more even. The decimation changes the surface by at most 4.7\,\% of the diagonal,
-but it does not make the triangles more even, so shapes that were decimated still have quite different triangle sizes. A remeshing
+After the preprocessing, all 2,483 shapes have between 5,016 and 9,961 vertices and no shape was lost. The refinement hardly
+moves the surface (at most 0.11\,\% of the diagonal) and makes the triangles more even. The decimation changes the surface by
+less than 2.2\,\% of the diagonal for 95\,\% of the decimated shapes, but it does not make the triangles more even, so shapes that were decimated still have quite different triangle sizes. A remeshing
 method that also equalizes the triangles could improve this, but such methods often fail on open and non-manifold meshes, which
 are very common in this database.
 
-Some problems are still left. 63 shapes are not consistently oriented, and most shapes are not closed. For Step~3 this means that
+Some problems are still left. 66 shapes are not consistently oriented, and most shapes are not closed. For Step~3 this means that
 volume-based features such as compactness, rectangularity and convexity have to be computed carefully, for example by checking
 whether a shape is closed. The six shapes of Table~\ref{tab:s23exceptions} also show that a general method can fail on unusual
-shapes, so it was important to check every result with the Hausdorff distance and not only with the vertex count.
+shapes, so it was important to check every result and not only its vertex count. The check of the surface area is cheap and
+catches all six failures, but it is a weaker test than a geometric comparison of the surfaces: two shapes end with a
+deviation of 6 to 9\,\% of the diagonal (Figure~\ref{fig:s23twoshapes}). With more computing time and memory, a geometric check
+could be used for the acceptance as well.
 
 \subsection{Conclusion}
 Step~2 prepared all 2,483 shapes for the next steps. The analysis tool measures the class, size, face type and bounding box of
 every shape, and the statistics showed a strongly skewed and unbalanced database with many mesh problems. After cleaning,
 reorientation and resampling, all shapes are in the range of 5,000 to 10,000 vertices, and a check with the statistics tool and
-the viewer confirmed this. Finally, all shapes were moved to the origin and scaled to a largest side of one. These normalized shapes
-are the input of the full normalization in Section~\ref{sec:normalization}.
+the viewer confirmed this. Finally, all shapes were moved to the origin and scaled to a largest side of one. The full
+normalization of Section~\ref{sec:normalization} repeats these two operations as part of its four steps and starts from the
+resampled shapes of Step~2.3.
 
 % =============================================================================================
 \section{Step 3: Feature Extraction}\label{sec:step3}
@@ -796,35 +967,39 @@ Step~3 consists of two parts: the full normalization of the shapes (Step~3.1) an
 
 \paragraph{Aim.}
 Before features are computed, all shapes have to be in the same position, orientation and size, so that the features describe
-the shape and not how it was stored in its file. The lecture slides give a normalization pipeline with four steps~[16]:
-translation, alignment, flipping and scaling. Translation and scaling were already done in Step~2.5. Step~3.1 adds the alignment
-and the flipping, and repeats the scaling at the end. Its input is the output of Step~2.5, so all shapes are already resampled,
-centered and scaled.
+the shape and not how it was stored in its file. The lecture slides give a normalization pipeline with four steps~[18]:
+translation, alignment, flipping and scaling. Step~3.1 applies all four steps, in this order, to the resampled shapes of
+Step~2.3. The translation and the scaling use the same formulas as Step~2.5. The shapes of Step~2.5 are not used as input:
+scaling them before the alignment would be wasted work, because the alignment changes the axis-aligned bounding box and the
+scaling has to be done again at the end anyway. Step~2.5 remains a separate step because the assignment asks for it in Step~2,
+and its result is checked there (Section~\ref{sec:s25}), but the final shapes are scaled only once.
 
 \paragraph{Translation.}
-The barycenter $\bar v$ is the mean of the vertices (Eq.~\eqref{eq:step2barycenter}), as in Step~2.5. The translation
-$v_i\leftarrow v_i-\bar v$ is part of the pipeline so that it also works for shapes that did not go through Step~2.5, for
-example a query shape. For the shapes of Step~2.5 it changes nothing, because they are already centered.
+The barycenter $\bar v$ is the mean of the vertices (Eq.~\eqref{eq:step2barycenter}), as in Step~2.5, and every vertex is moved
+by $v_i\leftarrow v_i-\bar v$. The same is done for a query shape from outside the database.
 
 \paragraph{Alignment.}
-The covariance matrix of the vertices is computed as in the lecture slides~[16]:
+The covariance matrix of the vertices is computed as in the lecture slides~[18]:
 \begin{equation}
   \Sigma=\frac1{N_V-1}\sum_{i=1}^{N_V}(v_i-\bar v)(v_i-\bar v)^{\mathsf T}.
   \label{eq:covariance}
 \end{equation}
 Its eigenvalues $\lambda_1\ge\lambda_2\ge\lambda_3$ and unit eigenvectors $e_1,e_2,e_3$ give the directions in which the
-shape is most, medium and least spread out. Every vertex of the centered shape is then projected onto these directions:
+shape is most, medium and least spread out. They are computed with \texttt{numpy.linalg.eigh}, the LAPACK solver for symmetric
+matrices, which is deterministic: it always returns the same result for the same matrix. The new coordinates of every vertex of the centered shape are
+its projections (dot products) onto these directions:
 \begin{equation}
   x_i\leftarrow v_i\cdot e_1,\qquad y_i\leftarrow v_i\cdot e_2,\qquad z_i\leftarrow v_i\cdot(e_1\times e_2).
   \label{eq:alignment}
 \end{equation}
-For the third axis, $e_1\times e_2$ is used instead of $e_3$. PCA only gives directions, so $e_1,e_2,e_3$ could form a
-left-handed coordinate system, which would mirror the shape. With the cross product the new axes are always right-handed, so the
-projection is a pure rotation and the faces keep their orientation. The signs of $e_1$ and $e_2$ are still arbitrary; this is
-fixed in the next step.
+For the third axis, $e_1\times e_2$ is used instead of $e_3$. It is the same axis as $e_3$, possibly with the opposite sign,
+so the shape is still aligned with its third principal axis. PCA only gives directions, so $e_1,e_2,e_3$ could form a
+left-handed coordinate system, and the projections would then also mirror the shape. With the cross product the three axes are
+always right-handed, and the projections keep the orientation of the faces. The three projections together are a linear map
+of the vertices. The signs of $e_1$ and $e_2$ are still arbitrary; this is fixed in the next step.
 
 \paragraph{Flipping.}
-The moment test of the lecture slides~[16] checks on which side of each axis the shape has more mass. Every triangle counts with
+The moment test of the lecture slides~[18] checks on which side of each axis the shape has more mass. Every triangle counts with
 the squared distance of its center to the plane through the origin:
 \begin{equation}
   f_k=\sum_{t=1}^{N_F}\operatorname{sign}(C_{t,k})\,C_{t,k}^2,\qquad
@@ -839,8 +1014,8 @@ orientation of every face. In that case the vertex order of all faces is reverse
 before the mirroring.
 
 \paragraph{Scaling.}
-The rotation changes the bounding box, so after the alignment the largest side is in general no longer one. The scaling of
-Step~2.5 is therefore applied again, using the largest side of the new bounding box:
+The alignment changes the axis-aligned bounding box, so the scaling has to come after it. The scaling of Step~2.5 is applied
+once, using the largest side of the axis-aligned bounding box of the aligned shape:
 \begin{equation}
   D_{\max}=\max\big(D_x,D_y,D_z\big),\qquad v_i\leftarrow v_i/D_{\max},
   \label{eq:dmax}
@@ -850,15 +1025,15 @@ After the alignment, the axis-aligned bounding box is the same as the oriented b
 
 \paragraph{Order of the steps.}
 The order is the one from the lecture slides and the technical tips. The translation comes first, because the projection and
-the moment test are computed around the origin. The flipping needs the aligned axes. The scaling comes last, because the bounding
-box changes with the rotation. Mirroring and scaling do not move the barycenter away from the origin, so the translation stays
+the moment test are computed around the origin. The flipping needs the aligned axes. The scaling comes last, because the
+axis-aligned bounding box changes with the alignment. Mirroring and scaling do not move the barycenter away from the origin, so the translation stays
 correct.
 
 \paragraph{Implementation.}
 The four steps are separate functions (\texttt{center}, \texttt{align}, \texttt{flip} and \texttt{scale}) in the file
-\path{mr_normalize.py}, written with NumPy~[5]. The eigenvectors are computed with \texttt{numpy.linalg.eigh}. The functions
-\texttt{center} and \texttt{scale} use the same formulas as Step~2.5. The script \path{run_step3_1.py} normalizes all shapes in
-about four minutes on eight cores and saves them as the input for the feature extraction.
+\path{mr_normalize.py}, written with NumPy~[5]. The functions \texttt{center} and \texttt{scale} use the same formulas as
+Step~2.5. The script \path{run_step3_1.py} reads the resampled shapes of Step~2.3, normalizes them in about five and a half
+minutes with four worker processes and saves them as the input for the feature extraction.
 
 \paragraph{Test on a known shape.}
 Before running the whole database, the pipeline was tested on a box of $4\times2\times1$. Its positive half was stretched along each
@@ -871,51 +1046,61 @@ described below.
 
 \paragraph{Verification on the whole database.}
 For each step, the value that the step should fix was measured on all 2,483 shapes (Table~\ref{tab:normcheck},
-Figure~\ref{fig:normhist}). The values ``before'' come from the resampled shapes of Step~2.3, i.e. before Step~2.5 and Step~3.1,
-so that the table shows the effect of all four normalization steps together. The values after the normalization were measured on
-the files as they were saved. It was also checked that the input from Step~2.5 is really centered and scaled: the largest distance
-of its barycenter to the origin is $4.1\cdot10^{-13}$ and its largest side is exactly one for all shapes.
+Figure~\ref{fig:normhist}). The values ``before'' come from the input, the resampled shapes of Step~2.3, so that the table
+shows the effect of all four normalization steps together. The values after the normalization were measured on the files as
+they were saved. For the alignment, the test follows the shapes through the normalization: the angles between the
+eigenvectors and the coordinate axes are measured before, the shape is normalized, the covariance matrix is computed again from
+the saved file, and the angles between its new eigenvectors and the $x$, $y$ and $z$ axes are measured. Since the sign of an
+eigenvector is arbitrary, the angle is computed from the absolute value of the dot product, so it lies between $0^\circ$ and
+$90^\circ$. After a correct alignment all three angles are zero.
 
 \begin{table}[htbp]\centering\small
 \begin{tabular}{@{}lllll@{}}\toprule
 Step & Measure & Target & Before & After\\\midrule
-Translation & $\lVert \bar v\rVert$ & 0 & median 0.57, max $1.9\cdot10^{8}$ & max $1.2\cdot10^{-12}$\\
-Alignment & angle$(e_1,x)$ & $0^\circ$ & median $52.0^\circ$ & below $10^{-6}$\,\textdegree\\
+Translation & $\lVert \bar v\rVert$ & 0 & median 0.57, max $1.8\cdot10^{8}$ & max $6.8\cdot10^{-12}$\\
+Alignment & angle$(e_1,x)$ & $0^\circ$ & median $52.5^\circ$ & below $10^{-6}$\,\textdegree\\
           & angle$(e_2,y)$ & $0^\circ$ & -- & max $2.1\cdot10^{-6}$\,\textdegree\\
-Flipping & shapes with some $f_k<0$ & 0 & 800 & 0\\
+          & angle$(e_3,z)$ & $0^\circ$ & -- & max $1.5\cdot10^{-6}$\,\textdegree\\
+Flipping & shapes with some $f_k<0$ & 0 & 801 & 0\\
 Scaling & $D_{\max}$ & 1 & 0.067 to $4.6\cdot10^{8}$ & 1.0000000 for all shapes\\
 \bottomrule\end{tabular}
 \caption{The normalization measures before (resampled shapes of Step~2.3) and after the full normalization, over all 2,483
-shapes. The angles after normalization are given for the shapes whose eigenvalues differ by more than 1\,\% (2,450 shapes
-for $e_1$, 2,341 shapes for $e_2$; see the text on shapes with unclear axes).}
+shapes. The angles after normalization are given for the shapes whose eigenvalues differ by more than 1\,\% (2,448 shapes
+for $e_1$, 2,331 shapes for $e_2$ and $e_3$; see the text on shapes with unclear axes).}
 \label{tab:normcheck}
 \end{table}
 
 \begin{figure}[htbp]\centering
 \includegraphics[width=\linewidth]{normalization_histograms.png}
-\caption{Histograms of the four normalization measures over all 2,483 shapes, before (outline) and after (filled) the
-normalization: (a) distance of the barycenter to the origin, (b) angle between the major eigenvector and the $x$ axis,
-(c) number of axes that fail the moment test, (d) largest side of the bounding box. Axes (a) and (d) are logarithmic,
-because the values cover many orders of magnitude (the barycenter distance goes from up to $1.9\cdot10^{8}$ before to about
-$10^{-13}$ after the normalization).}
+\caption{Histograms of the normalization measures over all 2,483 shapes, before (outline) and after (filled) the
+normalization: (a) distance of the barycenter to the origin, (b)--(d) angles between the eigenvectors $e_1$, $e_2$, $e_3$ and
+the $x$, $y$, $z$ axes (only shapes with clearly different eigenvalues), (e) number of axes that fail the moment test, (f)
+largest side of the bounding box. Axes (a) and (f) are logarithmic, because the values cover many orders of magnitude (the
+barycenter distance goes from up to $1.8\cdot10^{8}$ before to about $10^{-12}$ after the normalization).}
 \label{fig:normhist}
 \end{figure}
 
 \paragraph{Shapes with unclear axes.}
-An eigenvector is only well defined if its eigenvalue is different from the others. For 33 shapes, $\lambda_1$ and $\lambda_2$
-differ by less than 1\,\%, and for 109 more shapes $\lambda_2$ and $\lambda_3$ do. Most of them are rotationally symmetric objects
-such as cups, chess pieces, round tables and bottles. For such a shape, any direction in the plane of the two equal eigenvalues is
-a valid axis. The alignment is still a correct rotation, but the angle around the remaining axis is random. The lecture slides
-show the same effect for two of their example cups~[16]. The chess piece in Figure~\ref{fig:normexamples} is one of these
-shapes. Features that do not depend on the rotation are not affected.
+The test above only works when the eigenvectors are well defined, and an eigenvector is only well defined if its eigenvalue is
+different from the others. For 35 shapes, $\lambda_1$ and $\lambda_2$ differ by less than 1\,\%, and for 117 more shapes
+$\lambda_2$ and $\lambda_3$ do. Most of them are rotationally symmetric objects such as cups, chess pieces, round tables and
+bottles. For such a shape, every direction in the plane of the two (almost) equal eigenvalues is an eigenvector. The
+alignment still puts the plane in the right place, but the direction chosen inside the plane is arbitrary: \texttt{eigh} is
+deterministic, but a tiny change of the vertices, such as the rounding errors of the normalization itself, can turn the
+returned vectors by a large angle inside the plane. When the eigenvectors are computed again after the normalization, they can
+therefore point in another direction inside the plane than $x$ or $y$, although the shape was aligned correctly. For these
+shapes the angle test says nothing, so they are left out of the angles after the normalization in Table~\ref{tab:normcheck}
+and Figure~\ref{fig:normhist}. The lecture slides show the same effect for two of their example cups~[18]. The chess piece in
+Figure~\ref{fig:normexamples} is one of these shapes. Features that do not depend on the rotation are not affected.
 
 \paragraph{Orientation of the faces.}
-The normalization must not turn faces inside-out. Without the translation, the whole normalization is one linear map of the
-vertices (a rotation, a mirroring and a uniform scaling), and the same map tells in which direction the normal of every face has
-to point afterwards. This was checked for every face of every shape, with the map computed from the vertex positions before and
-after. None of the
-35.8 million faces points in the wrong direction, also for the 1,280 shapes that were mirrored by the moment test. Very thin
-triangles with less than $10^{-4}$ of the median triangle area (36,505 faces) were skipped, because their corners are stored with
+The normalization must not turn faces inside-out. Without the translation, the whole normalization consists of projections
+onto the three axes (dot products), a mirroring of some axes and a uniform scaling. Each of these is linear in the vertex
+positions, so together they are one linear map, a $3\times3$ matrix, and this matrix tells in which direction the normal of
+every face has to point afterwards. The translation is left out because it is not linear; it does not change the normals. The
+check was done for every face of every shape, with the matrix computed from the vertex positions before and after. None of the
+35.5 million faces points in the wrong direction, also for the 1,262 shapes whose map is a mirroring. Very thin triangles with
+less than $10^{-4}$ of the median triangle area (28,009 faces) were skipped, because their corners are stored with
 seven digits and the direction of their normal is only rounding noise. In addition, the signed
 volume~\eqref{eq:signedvolume} has the same sign before and after the normalization for all 572 shapes whose parts are all closed
 or almost closed (the same rule as in the orientation step of Section~\ref{sec:resampling}). This number is higher than the 480
@@ -930,11 +1115,11 @@ did not change the meshes. After the normalization, the largest side of the boun
 \paragraph{Visual check.}
 Figure~\ref{fig:normexamples} shows four shapes before and after the normalization, with the $x$ (red), $y$ (green) and
 $z$ (blue) axes drawn at the origin. After the normalization, the direction in which the vertices are spread out most lies along
-$x$ and the second one along $y$. For most shapes this is also the longest side of the bounding box (2,276 of the 2,483 shapes),
+$x$ and the second one along $y$. For most shapes this is also the longest side of the bounding box (2,270 of the 2,483 shapes),
 but not for all, because PCA uses the spread of all vertices and not only the outer extent of the shape. The sword was stored along the $z$ axis and the humanoid upright along $y$; both now lie along $x$. The bicycle
-was already lying along $x$, but PCA returned its main axis pointing in the $-x$ direction (the sign of an eigenvector is
-arbitrary), so the alignment turned it around by $180^\circ$. The moment test then found most of its mass on the positive side of
-every axis, so no flip was needed. The chess piece is one of the rotationally symmetric shapes.
+was already lying along $x$, but the normalization turned it around by $180^\circ$ about the $y$ axis: the signs of the
+eigenvectors are arbitrary, and the moment test chose the directions in which most of its mass lies on the positive side. The
+chess piece is one of the rotationally symmetric shapes.
 
 \newcommand{\normpair}[3]{%
 \begin{subfigure}{0.245\linewidth}\centering\includegraphics[width=\linewidth]{#1_before.png}\caption{#2, before}\end{subfigure}\hfill
@@ -951,9 +1136,9 @@ from the origin. All views are taken from the same direction, with $x$ pointing 
 
 \paragraph{Discussion.}
 All 2,483 shapes passed the checks of the full normalization: every shape has its barycenter at the origin, its principal axes
-along $x$ and $y$, a positive moment $f_k$ on each axis and a largest side of one. Step~3.1 starts from the output of Step~2.5
-and uses the same barycenter, so the two steps give the same result as running all four normalization steps at once. The main
-limitation is the group of 142 shapes with unclear axes, whose rotation around one axis is random. This does not matter for rotation-invariant features such as the
+along $x$, $y$ and $z$, a positive moment $f_k$ on each axis and a largest side of one. Step~3.1 starts from the resampled
+shapes of Step~2.3 and applies all four steps itself, with the translation and scaling formulas of Step~2.5, so every shape is
+scaled only once. The main limitation is the group of 152 shapes with unclear axes, whose rotation around one axis is random. This does not matter for rotation-invariant features such as the
 distributions A3 and D1--D4, but it has to be kept in mind for features that depend on the orientation.
 
 \subsection{Step 3.2: Shape Descriptors}
@@ -962,7 +1147,7 @@ distributions A3 and D1--D4, but it has to be kept in mind for features that dep
 \subsubsection{Aim}
 
 After the full normalization of Step 3.1, every shape is described by numbers, so that a query shape can later be compared with
-the database. Two types of descriptors are computed, as asked in the assignment~[1] and defined in the lecture slides~[16]: six
+the database. Two types of descriptors are computed, as asked in the assignment~[1] and defined in the lecture slides~[18]: six
 global descriptors, which give one value per shape, and five shape property distributions, which are reduced to histograms. All
 descriptors are computed on the normalized shapes of Step 3.1, so every shape has its barycenter at the origin, its largest side
 equal to 1, and is aligned with its principal axes. The extraction ran on all 2,483 shapes.
@@ -978,17 +1163,17 @@ A(M) = \sum_{j=1}^{N_F} \frac12\big\lVert (v_j^2-v_j^1)\times(v_j^3-v_j^1)\big\r
 
 \paragraph{Volume.}
 The volume is needed for three of the descriptors. It is computed with the signed volume of Eq.~\eqref{eq:signedvolume}, with the
-barycenter $\bar v$ as the reference point~[16]:
+barycenter $\bar v$ as the reference point~[18]:
 \begin{equation}
 \mathrm{Vol}(M) = \frac16\sum_{j=1}^{N_F} (v_j^1-\bar v)\cdot\big((v_j^2-\bar v)\times(v_j^3-\bar v)\big).
 \label{eq:s32_volume}
 \end{equation}
-The slides take the absolute value of this sum~[16]. Here the sign is kept: after Step~2 the normals point outwards, so a negative
-volume means that the faces of the shape point inwards, and such a volume is not used (see below).
-This formula is only exact for a closed mesh with consistent normals. Step~2 made the normals consistent for all but 63
+The slides take the absolute value of this sum~[18]. Here the sign is kept: after Step~2 the normals point outwards, so a negative
+volume means that the faces of the shape point inwards, and such a volume is replaced by an estimate (see below).
+This formula is only exact for a closed mesh with consistent normals. Step~2 made the normals consistent for all but 66
 shapes. But only 507 of the 2,483 shapes are closed, which here means that every edge belongs to exactly two triangles.
 Section~\ref{sec:normalization} counted 572 closed shapes, because it also accepts parts that are almost closed. For a mesh with a hole, the formula misses the cone between the hole
-and $\bar v$~[17]. The holes are therefore filled first, as proposed in the technical tips~[17]: the boundary edges are
+and $\bar v$~[19]. The holes are therefore filled first, as proposed in the technical tips~[19]: the boundary edges are
 followed to closed loops, and every loop is closed with a fan of triangles around the mean of its vertices. For a hole whose
 boundary vertices are $w_1,\ldots,w_m$, in the order in which the faces next to the hole list them, the added triangles are
 \begin{equation}
@@ -996,28 +1181,36 @@ boundary vertices are $w_1,\ldots,w_m$, in the order in which the faces next to 
 \label{eq:s32_fan}
 \end{equation}
 Each boundary edge is used in the opposite direction from the face next to it, so the fan triangles have the same orientation as
-the rest of the mesh and the normals stay consistent. After the filling, 577 more shapes are
-closed. For the other 1,243 shapes the mesh is still not closed, mostly because of non-manifold edges (1,056 of them), and
-Eq.~\eqref{eq:s32_volume} gives only an estimate; this is what the slides suggest for surfaces that are not closed~[16].
+the rest of the mesh and the normals stay consistent. After the filling, 567 more shapes are
+closed. For the other 1,249 shapes the mesh is still not closed, mostly because of non-manifold edges (1,059 of them), and
+Eq.~\eqref{eq:s32_volume} gives only an estimate; this is what the slides suggest for surfaces that are not closed~[18].
 
-A volume is only used when it can be correct:
+A computed volume is checked against two conditions that every real volume meets:
 \begin{equation}
 0<\mathrm{Vol}(M)\le 1.01\,\mathrm{Vol}_{\mathrm{hull}}(M)\qquad\text{and}\qquad 36\pi\,\mathrm{Vol}(M)^2\le A_c(M)^3 .
 \label{eq:s32_valid}
 \end{equation}
 The first condition says that the volume is positive and not larger than the volume of the convex hull (1\,\% is allowed for
 rounding). The second says that the shape is not more compact than a sphere with the same surface area, which is impossible;
-$A_c(M)$ is the area of the closed surface, explained below. For 156 shapes the volume does not meet these conditions, and their
-volume-based descriptors are left empty
-(Table~\ref{tab:s32_volume}).
+$A_c(M)$ is the area of the closed surface, explained below. For 160 shapes the computed volume does not meet these conditions.
+Leaving their volume empty would mean that every later step needs a special case for missing values, and a shape without a
+volume could not be compared in the same way as the others. These shapes therefore get a rough estimate instead: the size
+$\lvert\mathrm{Vol}(M)\rvert$ of the computed volume, limited to the largest values that Eq.~\eqref{eq:s32_valid} allows,
+\begin{equation}
+\mathrm{Vol}(M)\leftarrow\min\Big(\lvert\mathrm{Vol}(M)\rvert,\;\mathrm{Vol}_{\mathrm{hull}}(M),\;\sqrt{A_c(M)^3/(36\pi)}\Big),
+\label{eq:s32_estimate}
+\end{equation}
+and at least $10^{-12}$, so that no descriptor divides by zero. The estimate can be far from the true volume, but it is in the
+range of possible volumes, and an underestimated or overestimated volume still tells more about the shape than no volume. These
+shapes are marked as ``estimate'' in the feature table, so every shape has all descriptors (Table~\ref{tab:s32_volume}).
 
 \begin{table}[htbp]\centering\small
 \begin{tabular}{@{}lr@{}}\toprule
 Volume computed from & Shapes\\\midrule
 closed mesh & 507\\
-mesh closed by filling the holes & 577\\
-mesh still not closed (estimate) & 1,243\\
-rejected, no volume & 156\\\midrule
+mesh closed by filling the holes & 567\\
+mesh still not closed & 1,249\\
+impossible volume replaced by the estimate of Eq.~\eqref{eq:s32_estimate} & 160\\\midrule
 total & 2,483\\
 \bottomrule\end{tabular}
 \caption{How the volume of the shapes was obtained.}
@@ -1025,7 +1218,7 @@ total & 2,483\\
 \end{table}
 
 \paragraph{Compactness.}
-Compactness compares the shape with a sphere. The slides define it as~[16]
+Compactness compares the shape with a sphere. The slides define it as~[18]
 \begin{equation}
 C(M) = \frac{A_c(M)^3}{36\pi\,\mathrm{Vol}(M)^2},
 \label{eq:s32_compactness}
@@ -1033,9 +1226,10 @@ C(M) = \frac{A_c(M)^3}{36\pi\,\mathrm{Vol}(M)^2},
 which is 1 for a sphere and larger for every other shape. Here $A_c(M)$ is the area of the closed surface that encloses the
 volume, so the surface with the filled holes. Using the area of the open mesh together with the volume of the filled mesh would
 mix two different surfaces. For an open shelf with an area of 0.66 and a filled area of 2.02, this gave a value that is more
-compact than a sphere. The compactness grows without limit for flat shapes, where the volume is close to zero; the largest value in
+compact than a sphere. The compactness grows without limit for flat shapes, where the volume is close to zero. Apart from
+one Tree (m1097), which is completely flat and whose estimated volume is the lower limit of $10^{-12}$, the largest value in
 the database is $6.3\cdot10^{9}$. The feature table therefore also stores the sphericity $S(M)=1/C(M)$, which the slides give as the same
-measure on a different scale~[16]. It lies in $(0,1]$, which is easier to use for the comparison of shapes in Step~4.
+measure on a different scale~[18]. It lies in $(0,1]$, which is easier to use for the comparison of shapes in Step~4.
 
 \paragraph{3D rectangularity.}
 Rectangularity is the part of the oriented bounding box (OBB) that is filled by the shape:
@@ -1043,7 +1237,7 @@ Rectangularity is the part of the oriented bounding box (OBB) that is filled by 
 R_3(M) = \frac{\mathrm{Vol}(M)}{\mathrm{Vol}_{\mathrm{OBB}}(M)}.
 \label{eq:s32_rectangularity}
 \end{equation}
-The slides compute the OBB by aligning the shape with its principal axes and taking the axis-aligned box~[16]. The shapes are
+The slides compute the OBB by aligning the shape with its principal axes and taking the axis-aligned box~[18]. The shapes are
 already aligned in Step 3.1, so $\mathrm{Vol}_{\mathrm{OBB}}$ is simply the volume of the axis-aligned bounding box of the
 normalized shape.
 
@@ -1074,11 +1268,11 @@ E(M) = \frac{\lambda_1}{\lambda_3}.
 \label{eq:s32_eccentricity}
 \end{equation}
 It is 1 when the vertices spread equally in all directions and grows for long or flat shapes. For almost flat shapes $\lambda_3$
-is close to zero, so the values have a long tail: the median is 17.1, but 57 shapes have a value above 1,000.
+is close to zero, so the values have a long tail: the median is 17.0, but 56 shapes have a value above 1,000.
 
 \subsubsection{Shape Property Distributions}
 
-The five distributions of the slides~[16] are computed from randomly chosen vertices $v_1,\ldots,v_4$ of the shape:
+The five distributions of the slides~[18] are computed from randomly chosen vertices $v_1,\ldots,v_4$ of the shape:
 \begin{align}
 A_3 &= \cos^{-1}\frac{(v_1-v_2)\cdot(v_3-v_2)}{\lVert v_1-v_2\rVert\,\lVert v_3-v_2\rVert}, &
 D_1 &= \lVert v_1-\bar v\rVert, &
@@ -1091,15 +1285,15 @@ volume.
 
 \paragraph{Sampling.}
 A shape has about 7,500 vertices, so there are far too many vertex pairs, triples and quadruples to use them all. For A3, D2, D3
-and D4, $N_s=1{,}000{,}000$ random vertex tuples are used per shape, as recommended in the technical tips~[17]. The first version
-used 10,000; the measurement in the paragraph on the number of bins shows that this gives a noticeable random noise. As in the tips, a vertex is not allowed to appear twice in one tuple, since such a tuple gives an angle,
+and D4, $N_s=1{,}000{,}000$ random vertex tuples are used per shape, as recommended in the technical tips~[19]. With 10,000
+tuples the histograms still contain a noticeable random noise, as the measurement in the paragraph on the number of bins shows. As in the tips, a vertex is not allowed to appear twice in one tuple, since such a tuple gives an angle,
 area or volume of zero that says nothing about the shape. D1 needs only one vertex per value, so it uses all vertices of the
 shape and is not random. Every shape gets its own fixed random seed, made from its class and file name, so the results can be
 repeated exactly. The samples are processed in blocks of 100,000 to keep the memory use small.
 
 \paragraph{Histogram ranges.}
 Each distribution is reduced to a histogram with $B$ equal bins over a fixed range $[r_{\min},r_{\max}]$, the same for all
-shapes. A value outside the range is first moved to the nearest end of the range. As on the slides~[16], bin $j$ covers the
+shapes. A value outside the range is first moved to the nearest end of the range. As on the slides~[18], bin $j$ covers the
 interval
 \begin{equation}
 \Big[\,r_{\min}+(j-1)\,\frac{r_{\max}-r_{\min}}{B},\;\; r_{\min}+j\,\frac{r_{\max}-r_{\min}}{B}\Big),\qquad j=1,\ldots,B,
@@ -1111,20 +1305,21 @@ h_j=\frac{\text{number of values in bin } j}{\text{number of all values}} .
 \label{eq:s32_histogram}
 \end{equation}
 Every histogram then sums to one, and histograms made from different numbers of samples (D1 against the others) can be
-compared~[17]. The ranges were first taken from the unit cube (for example $\sqrt3$ for D1 and
-D2). This wasted many bins: with 32 bins, on average 21 of the D1 bins, 16 of the D3 bins and 20 of the D4 bins of a shape were
+compared~[19]. The ranges were first taken from the unit cube (for example $\sqrt3$ for D1 and
+D2). This wasted many bins: with 32 bins, on average 21 of the D1 bins, 15 of the D3 bins and 19 of the D4 bins of a shape were
 empty, and 13 D1 bins were empty for every shape in the database.
-The ranges are therefore set to the largest value found in the whole database, rounded up
-(Table~\ref{tab:s32_ranges}). A3 keeps its natural range of $[0^\circ,180^\circ]$.
+The ranges are therefore set a little above the largest value found in the whole database
+(Table~\ref{tab:s32_ranges}), so that no value of the database falls outside its range. A3 keeps its natural range of
+$[0^\circ,180^\circ]$.
 
 \begin{table}[htbp]\centering\small
 \begin{tabular}{@{}lrrr@{}}\toprule
 Descriptor & Largest value in the database & Range used & Range from the unit cube\\\midrule
 A3 & 180.0 & $[0,180]$ & $[0,180]$\\
-D1 & 1.115 & $[0,1.15]$ & $[0,1.73]$\\
-D2 & 1.577 & $[0,1.60]$ & $[0,1.73]$\\
-D3 & 0.841 & $[0,0.85]$ & $[0,0.93]$\\
-D4 & 0.588 & $[0,0.60]$ & $[0,0.69]$\\
+D1 & 1.096 & $[0,1.15]$ & $[0,1.73]$\\
+D2 & 1.527 & $[0,1.60]$ & $[0,1.73]$\\
+D3 & 0.813 & $[0,0.85]$ & $[0,0.93]$\\
+D4 & 0.592 & $[0,0.60]$ & $[0,0.69]$\\
 \bottomrule\end{tabular}
 \caption{Histogram ranges of the distribution descriptors.}
 \label{tab:s32_ranges}
@@ -1155,9 +1350,9 @@ assignment, and the five histograms give $5\times20=100$ values per shape.
 \begin{table}[htbp]\centering\small
 \begin{tabular}{@{}lrrrrrr@{}}\toprule
 Bins $B$ & 8 & 16 & 20 & 32 & 64 & 128\\\midrule
-noise, 10,000 samples & 0.010 & 0.016 & 0.018 & 0.023 & 0.032 & 0.046\\
+noise, 10,000 samples & 0.011 & 0.016 & 0.018 & 0.023 & 0.033 & 0.046\\
 noise, 1,000,000 samples & 0.001 & 0.002 & 0.002 & 0.002 & 0.003 & 0.005\\
-separation & 1.59 & 1.51 & 1.50 & 1.49 & 1.46 & 1.43\\
+separation & 1.56 & 1.49 & 1.48 & 1.47 & 1.44 & 1.41\\
 \bottomrule\end{tabular}
 \caption{Choice of the number of bins, for D2 on 138 shapes: noise between two random seeds, and separation of the classes
 (average difference between classes divided by the average difference within a class).}
@@ -1174,15 +1369,15 @@ separation & 1.59 & 1.51 & 1.50 & 1.49 & 1.46 & 1.43\\
 
 The script \path{run_s3_2.py} reads the normalized meshes of Step 3.1 and writes the feature table
 \path{report/data/step3/features_step3_2.csv}, with one row per shape, and a summary of every column in
-\path{features_step3_2_summary.csv}. The shapes are processed in parallel on 8 processor cores, which took 16 minutes
+\path{features_step3_2_summary.csv}. The shapes are processed in parallel with 6 worker processes, which took 17 minutes
 for the whole database. All 2,483 shapes were processed without an error.
 
 The table has 117 columns: the class and file name, the numbers of vertices and faces, the seven global values (surface area,
 compactness, sphericity, rectangularity, diameter, convexity and eccentricity), the volume with how it was obtained, the number
-of filled holes, the volumes of the convex hull and of the bounding box, the 100 histogram values and a status column. The
-volume-based values are empty for the 156 shapes with a rejected volume (6.3\,\% of the database). Every class
-has values for at least 63\,\% of its shapes. The empty values are kept empty instead of being set to zero, because a zero would be a real, wrong value; Step~4 leaves
-them out of the distance (Section~\ref{sec:s4dist}).
+of filled holes, the volumes of the convex hull and of the bounding box, the 100 histogram values and a status column. There are
+no empty values: the 160 shapes with an estimated volume (6.4\,\% of the database) have all descriptors as well, and the
+column with the source of the volume tells which values are estimates. In every class at least 59\,\% of the shapes have a
+volume that was computed and not estimated.
 
 As asked in the assignment, the features of a single shape can also be shown:
 \begin{center}
@@ -1219,41 +1414,76 @@ Eccentricity $E$ & 1.000 & 1.000 & 16.000 & 16.000\\
 \label{tab:s32_validation}
 \end{table}
 
+\subsubsection{Checking the Ranges}
+
+Every descriptor has a range of values that is possible for a normalized shape, which follows from its definition. Because the
+largest side of every shape is 1, the shape lies in a box of at most $1\times1\times1$, so its volume is at most 1 and no two of
+its points are further apart than $\sqrt3$. Compactness and eccentricity are at least 1, sphericity, rectangularity and
+convexity lie between 0 and 1, and the diameter lies between 1 and $\sqrt3$. For the distributions, the largest possible
+values in a unit cube are the ones in the last column of Table~\ref{tab:s32_ranges}. Table~\ref{tab:s32_theory} compares these
+ranges with the smallest and largest value in the database. All values are inside their theoretical range. The smallest
+values of sphericity, rectangularity and convexity are extremely small, because they belong to completely flat shapes, whose
+volume is almost zero. The surface area has no upper limit, since a shape can be folded many times inside its box.
+
+\begin{table}[htbp]\centering\small
+\begin{tabular}{@{}llrr@{}}\toprule
+Descriptor & Theoretical range & Smallest in the database & Largest in the database\\\midrule
+surface area $A$ & $(0,\infty)$ & 0.041 & 14.87\\
+volume $\mathrm{Vol}$ & $(0,1]$ & $10^{-12}$ & 0.566\\
+compactness $C$ & $[1,\infty)$ & 1.25 & $1.5\cdot10^{20}$\\
+sphericity $S$ & $(0,1]$ & $6.9\cdot10^{-21}$ & 0.800\\
+rectangularity $R_3$ & $(0,1]$ & $5.1\cdot10^{-10}$ & 0.949\\
+diameter $\mathrm{Diam}$ & $[1,\sqrt3]$ & 1.000 & 1.561\\
+convexity $C_v$ & $(0,1]$ & $2.6\cdot10^{-9}$ & 1.000\\
+eccentricity $E$ & $[1,\infty)$ & 1.03 & 76,550\\
+A3 & $[0^\circ,180^\circ]$ & -- & 180.0\\
+D1 & $[0,\sqrt3]$ & -- & 1.096\\
+D2 & $[0,\sqrt3]$ & -- & 1.527\\
+D3 & $[0,0.93]$ & -- & 0.813\\
+D4 & $[0,0.69]$ & -- & 0.592\\
+\bottomrule\end{tabular}
+\caption{Theoretical range of every descriptor for a shape with largest side 1, and the smallest and largest value found in the
+database. For the distributions, only the largest value over all samples of all shapes was recorded; their values cannot be
+negative by definition.}
+\label{tab:s32_theory}
+\end{table}
+
 \subsubsection{Demonstration on Database Shapes}
 
-To check that the values match what is seen, two shapes were taken for every global descriptor, one with a low and one with a
-high value. To avoid single outliers, the shapes closest to the 3rd and the 97th percentile were used, and for the volume-based
+To check that the values match what is seen, two shapes were taken for the volume and for every global descriptor, one with a
+low and one with a high value. To avoid single outliers, the shapes closest to the 3rd and the 97th percentile were used, and for the volume-based
 descriptors only shapes with a closed or filled mesh. Figure~\ref{fig:s32_demo} shows them.
 
 \begin{figure}[!htbp]\centering
 \includegraphics[width=0.66\linewidth]{s32_demo_descriptors.png}
-\caption{Shapes with a low (left) and a high (right) value of each global descriptor, at the 3rd and 97th percentile.}
+\caption{Shapes with a low (left) and a high (right) value of the volume and of each global descriptor, at the 3rd and 97th
+percentile.}
 \label{fig:s32_demo}
 \end{figure}
 
-The values agree with how the shapes look. The fan-shaped plant, made of thin flat leaves, has
-almost no volume for its large surface and gets a sphericity close to zero. The bottle is rounder than 97\,\% of the shapes
-with a closed or filled mesh.
-The tree fills only 0.5\,\% of its bounding box, while the computer, made of boxes, fills about half of it. The glasses have a
-convexity of 0.012, because their convex hull includes all the empty space between the frame and the legs, while the head is
-almost convex (0.90). The house, which is about as deep as it is wide, has an eccentricity of 1.6, and the gun, which is long and
-very thin, has 712. The diameter of the jet is 1: its two farthest points are the wing tips, which lie on its longest axis, so no
-diagonal is longer than its largest side. The shelf is large in two directions, so its diagonal of 1.29 is clearly longer than its
-largest side. The surface area is small for the jet made of thin plates and large for the gear wheel with its many
-teeth.
+The values agree with how the shapes look. The branch of the tree, a thin stick with a few small leaves, encloses almost no
+volume (0.0006), while the computer, made of boxes, has a volume of 0.23 inside its unit-size box. The building, seen from
+above in the figure, is very flat; it has almost no volume for its large surface and gets a sphericity close to zero, while the bird
+with its compact body has 0.41. The glasses fill only 0.6\,\% of their bounding box, while the bench, which is almost a block,
+fills about half of it. Other glasses have a convexity of 0.018, because their convex hull includes all the empty space
+between the frame and the legs, while the bottle is almost convex (0.90). The vase, which is about as deep as it is wide, has an
+eccentricity of 1.6, and the knife, which is long and very thin, has 714. The diameter of the sword is 1: its two farthest
+points are the ends of the blade, which lie on its longest axis, so no diagonal is longer than its largest side. The house is
+large in two directions, so its diagonal of 1.29 is clearly longer than its largest side. The surface area is small for the
+bird made of a few thin plates and large for the shelf with its many boards.
 
-The demonstration also shows a weak point: for flat shapes, such as the plant, the volume and with it sphericity, rectangularity
-and convexity are close to zero, and they say little more than ``this shape is flat''. The eccentricity tells the same, so these
+The demonstration also shows a weak point: for flat shapes, such as the building, the volume and with it sphericity,
+rectangularity and convexity are close to zero, and they say little more than ``this shape is flat''. The eccentricity tells the same, so these
 descriptors are partly redundant for flat shapes.
 
 \subsubsection{Checking the Histograms}
 
 Histogram descriptors cannot be checked against a known value, but similar shapes should have similar histograms and different
-shapes different ones~[17]. Two checks were made.
+shapes different ones~[19]. Two checks were made.
 
 First, two cars and a humanoid were compared (Figure~\ref{fig:s32_similar}). The two cars have almost the same histograms for A3, D2, D3 and D4: the difference, measured in the same
-way as for the number of bins, is between 0.009 and 0.029. The differences between a car and the humanoid are between 0.21 and 0.60,
-so 7 to 45 times larger. D1 is the least stable of the five: the two cars differ by 0.067, because D1 depends on where the parts
+way as for the number of bins, is between 0.009 and 0.016. The differences between a car and the humanoid are between 0.20 and 0.60,
+so 12 to 43 times larger. D1 is the least stable of the five: the two cars differ by 0.048, because D1 depends on where the parts
 of the shape lie relative to its barycenter, so small differences in the shape of the car move the peaks.
 
 \begin{figure}[!htbp]\centering
@@ -1263,10 +1493,10 @@ of the shape lie relative to its barycenter, so small differences in the shape o
 \end{figure}
 
 Second, the histograms of all shapes of four different classes were drawn on top of each other, as in the technical
-tips~[17] (Figure~\ref{fig:s32_classes}). Within each class the A3, D3 and D4 curves lie close together, and the classes have clearly
+tips~[19] (Figure~\ref{fig:s32_classes}). Within each class the A3, D3 and D4 curves lie close together, and the classes have clearly
 different forms. The swords have most of their angles close to $0^\circ$ or $180^\circ$ (three points along a thin blade are
 almost on a line) and very small triangles and tetrahedra, while the mugs have an A3 peak near $50^\circ$ and much larger D3 and
-D4 values. D1 varies much more within a class, which the slides also report for D1~[16]. Humanoids and cars are more alike in A3
+D4 values. D1 varies much more within a class, which the slides also report for D1~[18]. Humanoids and cars are more alike in A3
 and D2 than mugs and swords, so these two descriptors alone will not separate them well. A few mugs differ clearly from the rest of their class in D3 and D4 (the curves with a peak further to the left); such
 shapes will be hard to find with a query on another mug.
 
@@ -1279,11 +1509,13 @@ shapes will be hard to find with a query on another mug.
 
 \subsubsection{Limitations}
 
-The biggest weak point is still the volume. For 1,243 shapes the mesh could not be closed, so their volume is only an estimate.
-The values that are clearly impossible are removed, but a volume that is wrong and still possible stays in the table. The 63 shapes
+The biggest weak point is still the volume. For 1,249 shapes the mesh could not be closed, so their volume is only an estimate.
+The 160 values that are clearly impossible are replaced by the rough estimate of Eq.~\eqref{eq:s32_estimate}, which only
+guarantees a possible value and not a correct one, and a computed volume that is wrong but still possible stays in the table
+without being noticed. The 66 shapes
 that kept orientation conflicts after Step~2 can also get a wrong volume, because some of their tetrahedra are subtracted
-instead of added~[17]. The hole filling has its own limit. A fan of triangles is a good guess for a small, flat hole, but for a
-large opening, such as the open front of a shelf, it is only a rough guess of the closed shape~[17].
+instead of added~[19]. The hole filling has its own limit. A fan of triangles is a good guess for a small, flat hole, but for a
+large opening, such as the open front of a shelf, it is only a rough guess of the closed shape~[19].
 
 The distributions are computed from vertices, as the assignment asks, and not from points spread evenly over the surface. After
 Step~2 the vertices are spread fairly evenly (Section~\ref{sec:step2}), but parts with smaller triangles still get more samples
@@ -1292,7 +1524,7 @@ than other parts of the same size.
 Compactness and eccentricity have very long tails, with a few shapes having values thousands of times larger than the median.
 Step~4 therefore uses the logarithm of these values (Section~\ref{sec:s4norm}).
 
-Finally, it turned out that some shapes are in the database twice. 230 pairs of shapes have almost the same histograms (an
+Finally, it turned out that some shapes are in the database twice. 227 pairs of shapes have almost the same histograms (an
 average difference below 0.02), and the pairs that were checked are the same model, with the same number of faces in the original
 file and the same surface area. In 19 of these pairs the two copies are in different classes; for example, the same airship is
 both in AircraftBuoyant and in Rocket. These copies can make some queries in Step~4 look better than they really are, and the
@@ -1300,10 +1532,10 @@ copies with two labels can count as errors in the evaluation.
 
 \subsubsection{Conclusion}
 
-Step 3.2 describes every shape with seven global values and five histograms of 20 bins, together 107 numbers. By filling holes
-and checking every volume, the volume-based descriptors are available for 93.7\,\% of the shapes instead of only the closed
-ones. The descriptors gave the exact values on simple test shapes and values that match the look of the shapes in the database,
-and the histograms of one class are mostly similar. The feature table is the input for the querying in Step~4.
+Step 3.2 describes every shape with seven global values and five histograms of 20 bins, together 107 numbers. By filling holes,
+the volume is computed for 93.6\,\% of the shapes instead of only the closed ones, and the remaining shapes get a rough estimate,
+so every shape has all descriptors. The descriptors gave the exact values on simple test shapes, all values lie in their
+theoretical ranges, the values match the look of the shapes in the database, and the histograms of one class are mostly similar. The feature table is the input for the querying in Step~4.
 
 % =============================================================================================
 \section{Step 4: Querying}\label{sec:step4}
@@ -1319,10 +1551,10 @@ matches with their distances~[1].
 Every shape $M$ is described by the descriptors $\mathcal{G}$ of Step~3.2: six global descriptors and the five histograms A3,
 D1, D2, D3 and D4, so $\card{\mathcal{G}}=11$ descriptors with 106 values. The values of descriptor $g$ are written as
 $\varphi_g(M)$: one number for a global descriptor and 20 values for a histogram. Of compactness and sphericity, only the
-sphericity $S(M)$ is used, because the compactness reaches $6.3\cdot10^{9}$ while the sphericity lies between 0 and 1.
+sphericity $S(M)$ is used, because the compactness reaches $1.5\cdot10^{20}$ while the sphericity lies between 0 and 1.
 
-The global descriptors have very different ranges, from 1--1.6 for the diameter to 1--75,000 for the eccentricity, so without a
-normalization the descriptors with large values would decide the distance alone~[18]. The assignment asks to consider min-max
+The global descriptors have very different ranges, from 1--1.6 for the diameter to 1--77,000 for the eccentricity, so without a
+normalization the descriptors with large values would decide the distance alone~[20]. The assignment asks to consider min-max
 normalization and standardization~[1]:
 \begin{equation}
 \hat\varphi_g(M)=\frac{\varphi_g(M)-\varphi_g^{\min}}{\varphi_g^{\max}-\varphi_g^{\min}}
@@ -1332,12 +1564,12 @@ normalization and standardization~[1]:
 \end{equation}
 where $\varphi_g^{\min}$, $\varphi_g^{\max}$, $\mu_g$ and $\sigma_g$ are the smallest and largest value, the mean and the
 standard deviation of the descriptor over the database. Min-max normalization depends on the two most extreme shapes: for the
-eccentricity, 90\,\% of the shapes end up in an interval of only 0.006. Standardization is less sensitive to outliers and is the
-method recommended in the slides and the technical tips~[18,19], so it is used here. The histograms are not changed, because they
-already sum to one, which is the normalization recommended for histograms~[18,19].
+eccentricity, 90\,\% of the shapes end up in an interval of only 0.005. Standardization is less sensitive to outliers and is the
+method recommended in the slides and the technical tips~[20,21], so it is used here. The histograms are not changed, because they
+already sum to one, which is the normalization recommended for histograms~[20,21].
 
 Five of the six global descriptors cover several orders of magnitude: besides the eccentricity, the surface area goes from 0.04 to
-15, and the sphericity, rectangularity and convexity of flat shapes go down to between $10^{-10}$ and $10^{-5}$. For these five,
+15, and the sphericity, rectangularity and convexity of flat shapes go down to between $10^{-20}$ and $10^{-9}$. For these five,
 $\log_{10}\varphi_g(M)$ is standardized instead of the value itself, so that ratios count instead of absolute differences; the
 diameter is standardized directly. Figure~\ref{fig:s4norm} shows the effect and Table~\ref{tab:s4params} the parameters. The
 parameters are computed once on the database and saved, together with the normalized feature table
@@ -1354,13 +1586,13 @@ except the diameter are standardized after taking the logarithm.}
 \begin{table}[htbp]\centering\small
 \begin{tabular}{@{}lcrrr@{}}\toprule
 Descriptor $g$ & logarithm & $\mu_g$ & $\sigma_g$ & $\rho_g$\\\midrule
-surface area & yes & 0.065 & 0.394 & 0.851\\
-sphericity & yes & $-1.966$ & 1.011 & 0.931\\
-rectangularity & yes & $-1.033$ & 0.570 & 0.912\\
-diameter & no & 1.060 & 0.087 & 1.075\\
-convexity & yes & $-0.695$ & 0.516 & 0.940\\
-eccentricity & yes & 1.283 & 0.707 & 0.879\\
-A3, D1, D2, D3, D4 & -- & -- & -- & 0.092, 0.135, 0.090, 0.154, 0.212\\
+surface area & yes & 0.066 & 0.394 & 0.851\\
+sphericity & yes & $-1.998$ & 1.108 & 0.987\\
+rectangularity & yes & $-1.039$ & 0.612 & 0.949\\
+diameter & no & 1.060 & 0.086 & 1.073\\
+convexity & yes & $-0.702$ & 0.559 & 0.978\\
+eccentricity & yes & 1.282 & 0.705 & 0.877\\
+A3, D1, D2, D3, D4 & -- & -- & -- & 0.093, 0.135, 0.091, 0.154, 0.212\\
 \bottomrule\end{tabular}
 \caption{Normalization parameters of the database: mean $\mu_g$ and standard deviation $\sigma_g$ of every global descriptor
 (of its logarithm where indicated) and the spread $\rho_g$ of the descriptor distances (Section~\ref{sec:s4dist}).}
@@ -1375,13 +1607,13 @@ Humanoid, Jet, Mug, Sword and Tree, so the database for the queries has 2,473 sh
 exactly like the database: cleaning, reorientation and resampling (Section~\ref{sec:resampling}), the normalization of
 Sections~\ref{sec:s25} and~\ref{sec:normalization}, and the descriptors of Section~\ref{sec:descriptors}, which takes 1 to 4
 seconds. To check this chain, it was run on the original files of the ten query shapes and three other shapes. All features agree
-with the stored ones up to rounding: the largest difference is $1.2\cdot10^{-5}$, and only one compactness value of about 2,073
-differs in the sixth digit.
+with the stored ones up to rounding: the largest difference is $2.3\cdot10^{-5}$, in one histogram value of the Chess query, and
+the volume of every shape is obtained in the same way (closed, filled or not closed) as in the database.
 
 \subsection{Euclidean Distance}\label{sec:s4dist}
 The plain Euclidean distance between the full feature vectors gives the descriptors very different influence, because the 100
 histogram values and the six global values differ in number and in their typical differences. As proposed in the technical
-tips~[19], the distances of the single descriptors are therefore weighted. For two shapes $M_1$ and $M_2$, the distance for
+tips~[21], the distances of the single descriptors are therefore weighted. For two shapes $M_1$ and $M_2$, the distance for
 descriptor $g$ is
 \begin{equation}
 d_g(M_1,M_2)=\big\lVert\hat\varphi_g(M_1)-\hat\varphi_g(M_2)\big\rVert,
@@ -1390,19 +1622,18 @@ d_g(M_1,M_2)=\big\lVert\hat\varphi_g(M_1)-\hat\varphi_g(M_2)\big\rVert,
 the absolute difference for a global descriptor and the Euclidean distance between the two histograms otherwise. With $\rho_g$
 the standard deviation of $d_g$ over 200,000 random pairs of database shapes (Table~\ref{tab:s4params}), the distance is
 \begin{equation}
-D(M_1,M_2)=\sqrt{\frac{\card{\mathcal{G}}}{\card{\mathcal{G}_{12}}}\sum_{g\in\mathcal{G}_{12}}\left(\frac{d_g(M_1,M_2)}{\rho_g}\right)^2},
+D(M_1,M_2)=\sqrt{\sum_{g\in\mathcal{G}}\left(\frac{d_g(M_1,M_2)}{\rho_g}\right)^2},
 \label{eq:s4D}
 \end{equation}
-where $\mathcal{G}_{12}\subseteq\mathcal{G}$ are the descriptors available for both shapes. Without missing values, $D$ is the
-Euclidean distance between the feature vectors after every descriptor has been divided by $\rho_g$. The 156 shapes with missing
-volume-based descriptors are compared only on the descriptors they have, and the factor $\card{\mathcal{G}}/\card{\mathcal{G}_{12}}$
-keeps them from looking closer because fewer terms are added. For a query, $D$ is computed to all database shapes and sorted, and
-the $K$ closest shapes are returned with their distance, in 0.07 seconds per query. The histogram distance in
-Eq.~\eqref{eq:s4dg} is a parameter of the program, so that other distance functions can be used later.
+which is the Euclidean distance between the feature vectors after every descriptor has been divided by $\rho_g$. Because every
+shape has all descriptors (Section~\ref{sec:descriptors}), the same formula is used for all pairs of shapes, without a special
+case for missing values. For a query, $D$ is computed to all database shapes and sorted, and
+the $K$ closest shapes are returned with their distance, in 0.06 seconds per query. The histogram distance in
+Eq.~\eqref{eq:s4dg} is a parameter of the program; Section~\ref{sec:s4metrics} uses this to test two other distance functions.
 
 \subsection{Choice of the Options}\label{sec:s4compare}
 The options were compared by using every database shape once as a query for all other shapes. For every query, the precision
-of the $K=10$ closest shapes was computed as defined in the lecture slides~[20],
+of the $K=10$ closest shapes was computed as defined in the lecture slides~[22],
 \begin{equation}
 \mathrm{PPV}=\frac{TP}{TP+FP}=\frac{TP}{K},
 \label{eq:s4ppv}
@@ -1413,15 +1644,14 @@ averaged over all queries. Table~\ref{tab:s4options} shows the result. The evalu
 \begin{table}[htbp]\centering\small
 \begin{tabular}{@{}lr@{}}\toprule
 Option & PPV ($K=10$)\\\midrule
-one vector, min-max normalization & 0.281\\
-one vector, standardization & 0.274\\
-one vector, standardization with logarithm & 0.307\\
-only the five histograms & 0.217\\
-weighted descriptors, no logarithm & 0.290\\
-weighted descriptors, logarithm only for surface area and eccentricity & 0.312\\
-\textbf{weighted descriptors, logarithm, missing values left out (used)} & \textbf{0.319}\\
-weighted descriptors, logarithm, min-max normalization & 0.319\\
-weighted descriptors, logarithm, missing values replaced by the mean & 0.322\\\midrule
+one vector, min-max normalization & 0.288\\
+one vector, standardization & 0.278\\
+one vector, standardization with logarithm & 0.311\\
+only the five histograms & 0.215\\
+weighted descriptors, no logarithm & 0.298\\
+weighted descriptors, logarithm only for surface area and eccentricity & 0.318\\
+\textbf{weighted descriptors, logarithm, standardization (used)} & \textbf{0.325}\\
+weighted descriptors, logarithm, min-max normalization & 0.325\\\midrule
 random order & 0.021\\
 \bottomrule\end{tabular}
 \caption{Precision of the ten closest shapes, averaged over all 2,473 database shapes as queries. ``One vector'' is the plain
@@ -1431,21 +1661,20 @@ Euclidean distance between the full feature vectors; ``weighted descriptors'' is
 
 The logarithm and the weighting both improve the result, and the global descriptors add a lot compared with the histograms alone.
 With the weights, min-max normalization and standardization give the same result, because dividing by $\rho_g$ cancels any linear
-change of a descriptor. Replacing missing values by the mean is 0.002 better overall, but for the 156 shapes with missing values
-themselves it gives 0.178 instead of 0.214, because the mean makes them look like an average shape. The missing values are
-therefore left out. All options are far better than a random order, but on average only about three of the ten closest shapes have
+change of a descriptor. All options are far better than a random order, but on average only about three of the ten closest shapes have
 the right class.
 
 \subsection{Query Results}\label{sec:s4results}
-Figure~\ref{fig:s4queries} shows the ten outside queries with their five closest shapes; 20 of the 50 results have the class of
-the query. The Humanoid gets five correct shapes and the Bicycle, Jet and Sword four, because the shapes of these classes are similar to
-each other and different from most other shapes. The Bird, Car, Chess and Tree get none; for most of them the figure shows why. The Chess query is a flat chess
-board and is matched with other flat shapes such as a shelf, signs and tables. The Tree is a thin trunk with a few leaves and is
-matched with spoons, and the Car with long, low shapes such as motorcycles. The Mug finds two mugs and two vases with a similar
-round body, and the closest shape to the Guitar is a guitar labeled Musical\_Instrument, so this mistake comes from the class
-labels. In these cases the descriptors capture the overall form, but not the details that decide the class. Some results appear
-twice with almost the same distance, such as the two computers for the Bird (1.351 and 1.353); these are duplicated shapes of the
-database.
+Figure~\ref{fig:s4queries} shows the ten outside queries with their five closest shapes; 24 of the 50 results have the class of
+the query. The Humanoid gets five correct shapes and the Bicycle, Jet and Sword four, because the shapes of these classes are
+similar to each other and different from most other shapes. The Mug finds three mugs and a vase with a similar round body, and
+the Tree two trees. The Bird and the Chess query get none; for most of the mistakes the figure shows why. The Chess query is a
+flat chess board and is matched with other flat shapes such as a shelf, signs and doors. The Bird is a coarse, compact model
+and is matched with other compact shapes such as a head and two computers. The Car finds only one car and otherwise long, low
+shapes such as motorcycles. The closest shape to the Guitar is a guitar labeled Musical\_Instrument, so this mistake comes from
+the class labels. In these cases the descriptors capture the overall form, but not the details that decide the class. Some
+results appear twice with the same distance, such as the two computers for the Bird (1.51) and the two doors for the Chess
+query (2.32); these are duplicated shapes of the database.
 
 \begin{figure}[!htbp]\centering
 \includegraphics[width=0.92\linewidth]{s4_queries.png}
@@ -1456,458 +1685,170 @@ upside down (Section~\ref{sec:normalization}).}
 \label{fig:s4queries}
 \end{figure}
 
+\subsection{Cosine Distance and Earth Mover's Distance}\label{sec:s4metrics}
+Besides the Euclidean distance, the assignment names the cosine distance and the Earth Mover's Distance (EMD) as options~[1], and
+both are introduced in the lecture slides~[20]. They were tested as the histogram distance of Eq.~\eqref{eq:s4dg}. The global
+descriptors, the normalization and the weighting stay the same, and the spread $\rho_g$ of every histogram distance is measured
+again for the new distance. For two histograms $h=(h_1,\ldots,h_B)$ and $h'=(h'_1,\ldots,h'_B)$ of the same descriptor,
+\begin{equation}
+d_{\cos}(h,h')=1-\frac{\sum_{j=1}^{B}h_j\,h'_j}{\lVert h\rVert\,\lVert h'\rVert},\qquad
+d_{\mathrm{EMD}}(h,h')=\frac{1}{B-1}\sum_{j=1}^{B-1}\Big|\sum_{i=1}^{j}\big(h_i-h'_i\big)\Big| .
+\label{eq:s4metrics}
+\end{equation}
+The cosine distance compares only the direction of the two histograms seen as vectors and not their length. It is not a true
+metric, because the triangle inequality does not hold for it~[20]. The EMD measures how much of one histogram has to be moved,
+and how far, to turn it into the other one. For two histograms with the same bins and the same total, this is the summed
+difference of their cumulative sums, and the division by $B-1$ makes it relative to the range of the histogram. Unlike the
+Euclidean and the cosine distance, the EMD does not count two histograms as completely different when their peaks are shifted by
+one bin. Both distances are implemented in \path{run_step4_metrics.py}.
+
+The two distances were compared on the ten query shapes of Section~\ref{sec:s4query}, with the precision of the $K=5$ and $K=10$
+closest shapes (Table~\ref{tab:s4metrics}). For comparison, the table also gives the Euclidean distance on the same queries. On
+these queries the EMD gives a higher mean precision than the cosine distance for both values of $K$, 0.48 against 0.43 for $K=10$,
+and about the same as the Euclidean distance. The standard deviations are large and only ten queries were used, so the
+differences are a first indication and not a final result.
+
+\begin{table}[htbp]\centering\small
+\begin{tabular}{@{}lcc@{}}\toprule
+Histogram distance & PPV ($K=5$) & PPV ($K=10$)\\\midrule
+Euclidean (Section~\ref{sec:s4dist}) & 0.48 (0.37) & 0.45 (0.38)\\
+cosine & 0.40 (0.31) & 0.43 (0.32)\\
+EMD & 0.48 (0.38) & 0.48 (0.34)\\
+\bottomrule\end{tabular}
+\caption{Precision of the closest shapes for the ten query shapes with three histogram distances: mean and, in brackets,
+standard deviation over the queries.}
+\label{tab:s4metrics}
+\end{table}
+
 \subsection{Discussion and Conclusion}
 The global descriptors are standardized after taking the logarithm of all of them except the diameter, and the normalized feature
 table is stored. A query shape from outside the database is processed like the database and gives the same features. The weighted
-Euclidean distance performed best of the tested options and answers a query in 0.07 seconds. Its main weakness is that histograms
+Euclidean distance performed best of the tested options and answers a query in 0.06 seconds. Its main weakness is that histograms
 are compared bin by bin, so two similar histograms that are shifted by one bin count as different; this is one reason why the
-histograms alone give a low precision. In addition, all descriptors get the same weight although some separate the classes
-better than others, and the volume-based descriptors are only estimates for many shapes. The duplicated shapes make the values of
+histograms alone give a low precision. The EMD avoids this problem, and on the ten query shapes it gave a higher precision than
+the cosine distance (Section~\ref{sec:s4metrics}). In addition, all descriptors get the same weight although some separate the classes
+better than others, and the volume-based descriptors are only estimates for many shapes. Giving every shape a volume, even a
+rough one, keeps the distance simple, because no special case for missing values is needed. The duplicated shapes make the values of
 Table~\ref{tab:s4options} slightly too high.
 
-\section{Normalization and Shape Retrieval}
-\label{sec:step4}
+% =============================================================================================
+\section{Step 5: Scalability}\label{sec:step5}
+% =============================================================================================
 
 \subsection{Aim}
+In Step~4 a query is compared with every shape of the database, which gives an exact ranking but takes time in proportion to
+the size of the database. Step~5 adds two things that the assignment asks for~[1]: a spatial search structure that finds the
+nearest shapes of a query without comparing it with every shape, for a given number $K$ of shapes or for all shapes within a
+radius $R$, and a two-dimensional map of the whole feature database, made with t-SNE, in which every shape is a point. Both
+methods are covered in the lecture slides on scalability~[23].
 
-The aim of this step was to prepare the shape features for retrieval and to examine how different normalization methods and feature combinations affect the quality of the results. The feature values extracted in the previous step do not all have the same scale. For example, surface area can have much larger numerical values than sphericity. If the features are used directly, features with larger values may have too much influence on the distance calculation. Normalization helps reduce this problem and makes the feature values more comparable.
-In addition to normalization, this step compares several feature configurations and distance measures. The goal is to identify which settings return shapes that are more similar to a given query shape.
+\subsection{Feature Vectors}\label{sec:s5vectors}
+Every shape of the database (2,473 shapes) is described by one vector of 106 values: the six normalized global descriptors of
+Section~\ref{sec:s4norm} and the five histograms of 20 bins. Every descriptor is divided by the spread $\rho_g$ of its distances
+(Table~\ref{tab:s4params}). The Euclidean distance between two such vectors is then exactly the distance $D$ of
+Eq.~\eqref{eq:s4D}, so the search structure and the exact search of Step~4 use the same distance. The class and file name of
+every vector are stored separately, so that a result can be traced back to its shape. A query shape is turned into a vector in
+the same way, with the normalization parameters of the database. Because every shape has all descriptors
+(Section~\ref{sec:descriptors}), every vector is complete. For 40 random shapes compared with all database shapes, the distances
+computed from the vectors agree with Eq.~\eqref{eq:s4D} up to $6\cdot10^{-6}$, the rounding error of storing the vectors in single
+precision.
 
-\subsection{Design and Implementation}
+\subsection{Spatial Search Structure}\label{sec:s5search}
+The vectors are stored in a Hierarchical Navigable Small World (HNSW) graph~[24], built with the FAISS library~[13]. Every
+vector is a node, linked to some of its nearest neighbors, and the graph has several layers with fewer nodes in the higher
+layers. A search starts in the top layer, moves to the neighbor closest to the query and continues layer by layer, so that only
+a small part of the vectors is compared with the query. The method is approximate: it can miss a true neighbor, and the chance
+of this is controlled by the size of the candidate list during the search. The graph is built with 16 links per node and a
+candidate list of 200 (\texttt{efConstruction}), and searched with a candidate list of 100 (\texttt{efSearch}). The index is saved
+to disk together with the vectors and the shape names, and it is built again automatically when the features of Step~4 change.
 
-\subsubsection{Preparing the database and query shapes}
+Two kinds of queries are supported, as asked in the assignment~[1]. A $K$-nearest-neighbor query asks the index for the $K$
+closest vectors, plus a few extra so that the query itself can be left out when it is a database shape. A range query returns
+all shapes whose distance to the query is at most $R$. The index has no direct range search, so it is asked for a fixed number
+of nearest candidates (200 by default, or the whole database), and the candidates within the radius are kept. This finds all
+shapes within the radius as long as there are fewer of them than candidates.
 
-The feature table produced in Step 3 was used as the input for this step. It contains the global shape descriptors used for retrieval: surface area, sphericity, 3D rectangularity, diameter, convexity, and eccentricity.
-Ten shapes were held out as queries for evaluation. The remaining shapes formed the retrieval database. Keeping the query shapes separate from the database means that each query can be used to test whether the system retrieves other shapes from the same class. The evaluation therefore measures retrieval performance on shapes that were not included in the database as query examples.
-
-\subsubsection{Feature normalization}
-
-Several normalization and feature-handling configurations were compared. These included min--max normalization, standardization, applying a logarithm to selected feature values, using histogram features alone, and combining weighted descriptors. The comparison also included a configuration in which missing values were replaced by the mean.
-The purpose of these experiments was to check whether the way features are scaled and combined changes the retrieval results. Logarithmic transformation can reduce the influence of features with a wide range of values, while weighting allows selected descriptors to contribute more strongly to the final distance. Missing values were also considered because some descriptors in the original feature table were unavailable for certain shapes.
-
-\subsubsection{Distance calculation and retrieval}
-
-For a query shape, the system compares its feature representation with the feature representations of shapes in the database. It then calculates a distance and ranks the database shapes from the smallest distance to the largest. Shapes with smaller distances are treated as more similar to the query under the selected representation and distance measure.
-The top-ranked shapes are returned as the retrieval results. The implementation saves the normalized features, normalization parameters, query information, and comparison results in the Step 4 output folder. This makes it possible to inspect the results and repeat the comparison without manually recreating the calculations.
-
-\subsection{Experimental Evaluation}
-
-\subsubsection{Comparison of feature configurations}
-
-The configurations were compared using precision at 10. Precision@10 is the proportion of the ten retrieved shapes that belong to the same class as the query. A higher value indicates that more of the top ten results are relevant to the query.
-Table~\ref{tab:step4-options} presents the results reported by the Step 4 comparison script.
-
-\begin{table}[htbp]
-    \centering
-    \small
-    \caption{Precision@10 for the tested feature configurations.}
-    \label{tab:step4-options}
-    \begin{tabular}{p{0.76\linewidth}r}
-        \hline
-        \textbf{Configuration} & \textbf{Precision@10} \\
-        \hline
-        One vector, min--max, no log & 0.2813 \\
-        One vector, standardized, no log & 0.2740 \\
-        One vector, standardized, log & 0.3070 \\
-        Histograms only & 0.2169 \\
-        Weighted descriptors, standardized, log & 0.3192 \\
-        Weighted descriptors, min--max, log & 0.3192 \\
-        Weighted descriptors, missing values set to the mean & 0.3217 \\
-        Weighted descriptors, standardized, no log & 0.2900 \\
-        Weighted descriptors, log of surface area and eccentricity only & 0.3122 \\
-        Random order (expected value) & 0.0206 \\
-        \hline
-    \end{tabular}
-\end{table}
-
-The results show that the tested configurations did not perform equally. The highest Precision@10 was 0.3217, obtained when weighted descriptors were used and missing values were replaced by the mean. The two weighted-descriptor configurations using logarithmic transformation both reached 0.3192. In comparison, using histogram features alone reached 0.2169, which was the lowest score among the non-random configurations.
-The random-order expected value was 0.0206. The tested configurations scored above this baseline, suggesting that the feature-based retrieval system performed better than random ranking on this evaluation. However, the differences between the strongest configurations are small, so the results do not establish that one configuration will always be best for every query or dataset.
-
-\subsubsection{Comparison of distance measures}
-A separate evaluation compared cosine distance and Earth Mover's Distance (EMD) using the ten held-out query shapes. The average precision values are shown in Table~\ref{tab:step4-metrics}.
-
-\begin{table}[htbp]
-    \centering
-    \small
-    \caption{Mean precision for cosine distance and EMD across ten queries.}
-    \label{tab:step4-metrics}
-    \begin{tabular}{lrrr}
-        \hline
-        \textbf{Distance measure} & \textbf{k} & \textbf{Mean precision@k} & \textbf{Standard deviation} \\
-        \hline
-        Cosine & 5 & 0.36 & 0.3239 \\
-        Cosine & 10 & 0.36 & 0.3169 \\
-        EMD & 5 & 0.42 & 0.3458 \\
-        EMD & 10 & 0.43 & 0.3529 \\
-        \hline
-    \end{tabular}
-\end{table}
-
-In this evaluation, EMD achieved a higher mean precision than cosine distance at both values of \(k\). At \(k=10\), for example, the mean precision was 0.43 for EMD and 0.36 for cosine distance. This suggests that EMD may be a useful option for this retrieval task. Still, the evaluation includes only ten queries, so the difference should be treated as an initial result rather than a final conclusion.
-
-\subsection{Discussion}
-
-Overall, the experiments show that both feature preparation and the choice of distance measure can affect retrieval quality. The strongest result in the configuration comparison came from weighted descriptors with missing values replaced by the mean, while histogram features alone produced a lower score. The separate distance comparison also favoured EMD over cosine distance for the tested queries.
-These results should be interpreted with some care. Only ten query shapes were used in the evaluation, and performance can vary between classes. A larger evaluation set would help determine whether the observed differences remain consistent. It would also be useful to inspect the retrieved shapes for individual queries, since a single average score does not show every strength or weakness of the retrieval system.
-
-\documentclass[10pt,a4paper]{article}
-
-\usepackage[T1]{fontenc}
-\usepackage[utf8]{inputenc}
-\usepackage{lmodern}
-\usepackage[a4paper,top=2.0cm,bottom=2.0cm,left=2.2cm,right=2.2cm]{geometry}
-\usepackage{microtype}
-
-% mathematics
-\usepackage{amsmath,amssymb}
-
-% figures and tables
-\usepackage{graphicx}
-\usepackage{adjustbox}
-\usepackage{booktabs}
-\usepackage{array}
-\usepackage[font=small,labelfont=bf,skip=3pt]{caption}
-\usepackage{subcaption}
-\usepackage{xcolor}
-\usepackage{tikz}
-\usetikzlibrary{arrows.meta,positioning}
-\usepackage{enumitem}
-\usepackage{url}
-
-% compact spacing
-\setlength{\parindent}{0pt}
-\setlength{\parskip}{3.5pt plus 1pt}
-\linespread{1.0}
-\usepackage{titlesec}
-\titlespacing*{\section}{0pt}{12pt plus 2pt minus 2pt}{5pt plus 1pt}
-\titlespacing*{\subsection}{0pt}{9pt plus 2pt minus 2pt}{3pt plus 1pt}
-\titlespacing*{\subsubsection}{0pt}{7pt plus 2pt minus 1pt}{2pt plus 1pt}
-\titleformat{\section}{\large\bfseries}{\thesection}{0.6em}{}
-\titleformat{\subsection}{\normalsize\bfseries}{\thesubsection}{0.6em}{}
-\titleformat{\subsubsection}{\normalsize\bfseries\itshape}{\thesubsubsection}{0.6em}{}
-\setlength{\textfloatsep}{9pt plus 2pt minus 2pt}
-\setlength{\floatsep}{7pt plus 2pt minus 2pt}
-\setlength{\intextsep}{7pt plus 2pt minus 2pt}
-\renewcommand{\arraystretch}{1.08}
-\setlist{nosep,leftmargin=1.4em}
-
-% numbering: tables and figures are numbered per section (Table 2.3, Figure 1.4, ...)
-\setcounter{secnumdepth}{3}
-\usepackage{chngcntr}
-\counterwithin{table}{section}
-\counterwithin{figure}{section}
-\counterwithin{equation}{section}
-
-% all figures are in this folder
-\graphicspath{{Images/}}
-
-\newcommand{\R}{\mathbb{R}}
-\newcommand{\card}[1]{\lvert #1\rvert}
-
-\usepackage[hidelinks,pdfusetitle]{hyperref}
-
-\subsection{Conclusion}
-In this step, the global shape descriptors from Step 3 were prepared for retrieval, and several normalization, feature-handling, and distance-measure options were evaluated. The best Precision@10 among the tested configurations was 0.3217, achieved by weighted descriptors with missing values replaced by the mean. In the separate distance-measure evaluation, EMD achieved a mean Precision@10 of 0.43, compared with 0.36 for cosine distance.
-The results indicate that the representation and distance measure both matter for shape retrieval. Since the evaluation used ten queries, further testing would be needed before treating these results as conclusive.
-
-\section{Step 5: Approximate Nearest-Neighbour Search and Visualization}
-\label{sec:step5}
-
-\subsection{Aim and Overview}
-\label{sec:s5overview}
-
-In Step 4, similarity was calculated by comparing a query shape with
-the shapes stored in the database. This gives an exact ranking according
-to the selected distance function, but every query requires distances
-to be calculated across the database. In this step, an approximate
-nearest-neighbour (ANN) index was added to make retrieval faster.
-
-The implementation uses a Hierarchical Navigable Small World (HNSW)
-index. It supports $k$-nearest-neighbour queries and radius-based
-queries. A t-distributed Stochastic Neighbour Embedding (t-SNE) plot
-was also generated to make the feature database easier to inspect.
-
-The database contains 2,473 shapes. Each shape is represented by a
-106-dimensional vector. Five queries from different classes were
-tested against the exact search from Step 4.
-
-\subsection{Feature Vector Construction}
-\label{sec:s5features}
-
-Each row of the normalized feature table represents one shape. The
-vector contains six global descriptors and five histogram descriptors.
-Each histogram contains 20 bins, so the total dimensionality is
-
+\subsection{Evaluation of the Search}\label{sec:s5eval}
+The results of the index were compared with the exact search of Step~4. If $\mathcal{A}_K$ is the set of the $K$ closest shapes
+found by the index and $\mathcal{E}_K$ the set found by the exact search, the recall is
 \begin{equation}
-d = 6 + 5 \times 20 = 106.
-\label{eq:s5dimension}
-\end{equation}
-
-The global descriptors are surface area, sphericity, rectangularity,
-diameter, convexity and eccentricity. The histogram descriptors are
-A3, D1, D2, D3 and D4. Class and file names are stored separately as
-metadata so that a returned vector can be mapped back to its shape.
-
-Some shapes have missing values for volume-related descriptors. For
-the ANN vectors, missing normalized values were filled with zero to
-keep every vector the same length. This is convenient for indexing,
-but it does not reproduce the missing-value handling used by Step 4.
-The effect of this difference is discussed below.
-
-\begin{table}[!htbp]
-\centering
-\small
-\begin{tabular}{|l|r|}
-\hline
-\textbf{Property} & \textbf{Value}\\ \hline
-Number of shapes & 2,473\\
-Global descriptors & 6\\
-Histogram descriptors & 5\\
-Bins per histogram & 20\\
-Vector dimensions & 106\\
-Shapes with incomplete volume-related descriptors & 156\\
-Shapes with all three descriptors available & 2,317\\
-\hline
-\end{tabular}
-\caption{Properties of the Step 5 feature matrix. The missing-value
-check concerns sphericity, rectangularity and convexity.}
-\label{tab:s5features}
-\end{table}
-
-\subsection{HNSW Index Construction}
-\label{sec:s5index}
-
-The feature vectors were used to build an HNSW index. HNSW stores
-vectors in a graph that helps the search move towards promising
-neighbours without examining every database vector for every query.
-Because the method is approximate, it can trade exhaustive coverage
-for lower query time.
-
-The index, vector matrix and metadata were saved to disk. The main
-outputs are listed in Table~\ref{tab:s5files}.
-
-\begin{table}[!htbp]
-\centering
-\small
-\begin{tabular}{|l|p{8cm}|}
-\hline
-\textbf{Output file} & \textbf{Purpose}\\ \hline
-\texttt{ann\_index.bin} & Saved ANN index\\
-\texttt{ann\_vectors.npy} & Numerical feature vectors\\
-\texttt{ann\_metadata.csv} & Class and file metadata\\
-\texttt{ann\_query\_results.csv} & Saved ANN query results\\
-\texttt{ann\_exact\_comparison.csv} & ANN and exact-search comparison\\
-\hline
-\end{tabular}
-\caption{Main outputs generated by the Step 5 implementation.}
-\label{tab:s5files}
-\end{table}
-
-\subsection{Nearest-Neighbour Evaluation}
-\label{sec:s5knn}
-
-For each test query, the system returned ten nearest shapes. The
-identities of the ANN results were compared with the exact Step 4
-results using class and file name. If $A_k$ is the set of ANN results
-and $E_k$ is the set of exact results, recall at $k$ is
-
-\begin{equation}
-\operatorname{Recall@}k =
-\frac{|A_k \cap E_k|}{|E_k|}.
+\mathrm{Recall}@K=\frac{\card{\mathcal{A}_K\cap\mathcal{E}_K}}{\card{\mathcal{E}_K}},
 \label{eq:s5recall}
 \end{equation}
+which is 1 when the index finds every shape that the exact search finds. Five database shapes were used as test queries
+(Table~\ref{tab:s5timing}). For all five, the recall for $K=10$ is 1. The time of the exact search was measured as a call of the
+query function of Step~4, which also reads the stored feature table from disk, and the time of the index only for the search
+itself. Measured in this way, the index was 84 to 690 times faster. In addition, every database shape was used once as a query:
+for all 2,473 shapes the index returns the same ten closest shapes as the exact search.
 
-A value of 1.0 means that every shape in the exact top-$k$ set also
-appears in the ANN top-$k$ set. All five tested queries achieved
-recall@10 of 1.0. This finding applies to the tested queries; it is
-not a guarantee for every possible query.
-
-\begin{table}[!htbp]
-\centering
-\small
-\begin{tabular}{|l|r|r|r|r|}
-\hline
-\textbf{Query} & \textbf{ANN (ms)} & \textbf{Exact (ms)} &
-\textbf{Speedup} & \textbf{Recall@10}\\ \hline
-Mug & 0.2846 & 117.1326 & 411.6$\times$ & 1.00\\
-HumanHead & 0.3080 & 149.5928 & 485.7$\times$ & 1.00\\
-Computer & 0.1526 & 77.6886 & 509.1$\times$ & 1.00\\
-Quadruped & 0.5057 & 158.7760 & 314.0$\times$ & 1.00\\
-Hand & 0.1404 & 88.2732 & 628.7$\times$ & 1.00\\
-\hline
-\end{tabular}
-\caption{Measured search times and recall for five queries. Speedup
-is the exact-search time divided by the ANN-search time.}
+\begin{table}[htbp]\centering\small
+\begin{tabular}{@{}lrrrr@{}}\toprule
+Query & Index (ms) & Exact search (ms) & Speed-up & $\mathrm{Recall}@10$\\\midrule
+Mug D00685 & 1.07 & 89.0 & 84 & 1.0\\
+HumanHead D00591 & 0.26 & 77.0 & 299 & 1.0\\
+Computer m1778 & 0.25 & 80.5 & 317 & 1.0\\
+Quadruped D00795 & 1.18 & 118.9 & 101 & 1.0\\
+Hand D01022 & 0.38 & 264.3 & 690 & 1.0\\
+\bottomrule\end{tabular}
+\caption{Search time of the index and of the exact search of Step~4 (including reading the feature table), speed-up and recall of
+the ten closest shapes for five test queries.}
 \label{tab:s5timing}
 \end{table}
 
-The ANN search took approximately 0.14--0.51 ms in these tests,
-compared with approximately 77.7--158.8 ms for the exact search.
-The measured speedups were about 314--629 times. These results suggest
-that the index can reduce query time substantially for this database.
-The measurements depend on the tested queries and execution environment,
-so they should not be treated as universal performance guarantees.
+Table~\ref{tab:s5mug} shows the result of the index for the Mug D00685. None of its ten closest shapes is a mug; the closest are
+two human heads, two computers and a quadruped. The search finds the shapes whose descriptors are closest, and shapes of different
+classes can have similar descriptors. The other four test queries were taken from this list (ranks 1, 2, 4 and 8), so the five
+queries cover five classes that lie close together in the feature space.
 
-\subsection{Example Query Results}
-\label{sec:s5example}
-
-The Mug shape \texttt{D00685.obj} was used to inspect a concrete
-nearest-neighbour result. Table~\ref{tab:s5mug} lists its ten nearest
-shapes as returned by the ANN implementation.
-
-\begin{table}[!htbp]
-\centering
-\small
-\begin{tabular}{|r|l|l|r|}
-\hline
-\textbf{Rank} & \textbf{Class} & \textbf{File} & \textbf{Distance}\\ \hline
-1 & HumanHead & D00591.obj & 2.36612\\
-2 & HumanHead & D00488.obj & 2.57605\\
-3 & Computer & m1778.obj & 2.58516\\
-4 & Computer & D01067.obj & 2.58728\\
-5 & Quadruped & D00795.obj & 2.60745\\
-6 & Hand & D01022.obj & 2.61365\\
-7 & Hand & m330.obj & 2.61472\\
-8 & HumanHead & m353.obj & 2.66236\\
-9 & ClassicPiano & D00190.obj & 2.73024\\
-10 & AquaticAnimal & m66.obj & 2.74824\\
-\hline
-\end{tabular}
-\caption{Top-ten ANN results for the query Mug/D00685.obj.}
+\begin{table}[htbp]\centering\small
+\begin{tabular}{@{}rllr@{}}\toprule
+Rank & Class & File & Distance $D$\\\midrule
+1 & HumanHead & D00591 & 2.361\\
+2 & Computer & m1778 & 2.482\\
+3 & Computer & D01067 & 2.485\\
+4 & Quadruped & D00795 & 2.505\\
+5 & HumanHead & D00488 & 2.572\\
+6 & Apartment & D00086 & 2.597\\
+7 & Hand & m330 & 2.625\\
+8 & Hand & D01022 & 2.631\\
+9 & ClassicPiano & D00190 & 2.635\\
+10 & HumanHead & m353 & 2.654\\
+\bottomrule\end{tabular}
+\caption{The ten closest shapes of the Mug D00685 found by the index.}
 \label{tab:s5mug}
 \end{table}
 
-The result includes several different classes. This is possible because
-retrieval is based on the feature representation rather than on class
-labels. Shapes from different classes can have similar geometric
-descriptors. The results should therefore be interpreted by examining
-the shapes and the intended notion of similarity, rather than by
-expecting every result to have the same class as the query.
+The range query was tested with the same Mug and $R=2.7$, with the whole database as candidates. The exact search finds 11 shapes
+within this radius, apart from the query itself, and the index returns the same 11 shapes.
 
-\subsection{Radius-Based Retrieval}
-\label{sec:s5radius}
+\subsection{Map of the Database with t-SNE}\label{sec:s5tsne}
+The vectors have 106 dimensions and cannot be plotted directly. t-SNE~[25] places every vector as a point in two dimensions so
+that vectors that are close to each other in the feature space are also close in the plot; distances between points that are far
+apart are not preserved~[23]. The implementation of scikit-learn~[14] was used, with perplexity 30, 1,000 iterations, an initial
+layout from PCA, an automatic learning rate, the Barnes--Hut approximation and the random seed 42. The perplexity lies in the range
+of 30 to 40 recommended in the technical tips~[26], and the computation takes about 17 seconds for the whole database. The program
+writes an interactive plot in which every point is colored by its class and shows the class and file name of its shape when the
+mouse is moved over it.
 
-A radius query returns shapes whose distance from the query is below
-a selected threshold, rather than returning a fixed number of shapes.
-For Mug/D00685.obj, a radius of 2.7 was tested. An exact brute-force
-check in the saved 106-dimensional vector space found eight non-self
-matches within the radius, and the ANN search returned all eight.
+Figure~\ref{fig:s5tsne} shows the map. Six classes form compact groups: glasses, computer keyboards, fish, bicycles, human heads
+and shelves. Most other classes are spread over large parts of the map and overlap, which agrees with the precision of about 0.3
+in Step~4: for many classes, the descriptors do not separate them from other classes. The map is meant for exploring the
+database. It does not measure the quality of the retrieval, because t-SNE keeps the neighborhoods but changes the large
+distances.
 
-\begin{table}[!htbp]
-\centering
-\small
-\begin{tabular}{|l|r|}
-\hline
-\textbf{Property} & \textbf{Result}\\ \hline
-Query & Mug/D00685.obj\\
-Radius & 2.7\\
-Exact non-self matches & 8\\
-ANN non-self matches & 8\\
-Exact matches recovered & 8 of 8\\
-\hline
-\end{tabular}
-\caption{Radius-query validation for one query in the saved vector space.}
-\label{tab:s5radius}
-\end{table}
-
-This test shows agreement for this query only. HNSW is approximate,
-so it does not guarantee that every radius query will recover every
-valid candidate.
-
-\subsection{t-SNE Visualization}
-\label{sec:s5tsne}
-
-The original feature vectors have 106 dimensions, which makes them
-difficult to inspect in a conventional two-dimensional plot. t-SNE
-was used to project the vectors into two dimensions while attempting
-to preserve local neighbourhood relationships.
-
-The embedding was generated with perplexity 30, 1,000 iterations,
-PCA initialization, automatic learning rate, random seed 42 and the
-Barnes--Hut method. The plot contains the 2,473 database shapes.
-Points are coloured by class, and the interactive HTML version
-provides shape information on hover.
-
-Figure~\ref{fig:s5tsne} shows the saved screenshot of the embedding.
-The plot is useful for exploring possible groups and overlaps between
-classes. It should be treated as an exploratory visualization:
-t-SNE can distort global distances, and visual clusters do not by
-themselves prove semantic similarity.
-
-\begin{table}[!htbp]
-\centering
-\small
-\begin{tabular}{|l|l|}
-\hline
-\textbf{Parameter} & \textbf{Value}\\ \hline
-Input shapes & 2,473\\
-Input dimensions & 106\\
-Output dimensions & 2\\
-Perplexity & 30\\
-Iterations & 1,000\\
-Initialization & PCA\\
-Learning rate & Automatic\\
-Random seed & 42\\
-Method & Barnes--Hut\\
-\hline
-\end{tabular}
-\caption{Parameters used for the t-SNE embedding.}
-\label{tab:s5tsneparams}
-\end{table}
-
-\begin{figure}[!htbp]
-\centering
-\includegraphics[width=\linewidth]
-{data/step4/3d-shape-feature-database-t-sne-2d-embed.png}
-\caption{Two-dimensional t-SNE embedding of the 2,473 shapes, with
-points coloured by class. The interactive HTML version also shows
-shape information on hover.}
+\begin{figure}[htbp]\centering
+\includegraphics[width=0.85\linewidth]{s5_tsne.png}
+\caption{t-SNE map of the 2,473 database shapes. The six most compact classes with at least 20 shapes are colored (number of
+shapes in brackets); all other shapes are grey. The interactive version colors every class and shows the shape under the mouse.}
 \label{fig:s5tsne}
 \end{figure}
 
-\subsection{Limitations and Discussion}
-\label{sec:s5limitations}
-
-The comparison with Step 4 needs one qualification. Step 4 excludes
-missing descriptor values from the distance calculation and adjusts
-the combined distance according to the number of available
-descriptors. In contrast, the ANN vectors replace missing normalized
-values with zero. These approaches are not equivalent, so distance
-values can differ for shapes with missing descriptors.
-
-For the 2,317 shapes with complete values for the three checked
-volume-related descriptors, the recorded mean absolute distance
-difference was approximately $3.5\times10^{-7}$ and the maximum
-difference was approximately $2.55\times10^{-6}$. For the 156 shapes
-with missing values, the mean absolute difference was approximately
-0.2401 and the maximum was approximately 1.3734. Despite this
-difference, the top-ten identities matched in the five query tests.
-
-The evaluation is limited to five nearest-neighbour queries and one
-radius query. More tests would be needed to assess how often ANN
-matches exact search across the whole database. Similarly, t-SNE
-helps inspect the data but is not a substitute for quantitative
-retrieval evaluation.
-
-\subsection{Conclusion}
-\label{sec:s5conclusion}
-
-Step 5 adds HNSW-based nearest-neighbour search, radius-based
-retrieval and a two-dimensional t-SNE visualization to the shape
-retrieval system. The index was built for 2,473 shapes represented
-by 106-dimensional vectors. All five tested nearest-neighbour
-queries achieved recall@10 of 1.0, and the ANN query times were
-substantially lower than the measured exact-search times. The
-radius test recovered all eight matches for the selected Mug query
-in the saved vector space.
-
-The visualization provides another way to explore the feature
-database and inspect possible relationships between classes. The
-main technical limitation is the difference in missing-value
-handling between Step 4 and Step 5. The results therefore show
-successful implementation and promising performance on the tested
-examples, while further validation would be needed to make broader
-claims. 
+\subsection{Discussion and Conclusion}
+The HNSW index returns the same shapes as the exact search of Step~4 and supports both $K$-nearest-neighbor and range queries. It
+uses the same distance as Step~4, because the vectors are scaled with the same weights. The evaluation of the speed is limited:
+only five queries were timed, and the time of the exact search includes reading the feature table, while the time of the index
+does not. The range query was tested for one query only. The t-SNE map shows that a few classes form clear groups, while most
+classes overlap. It complements the precision values of Step~4, but it is not a quantitative evaluation of the system.
 
 \clearpage
 \section*{References}
@@ -1936,29 +1877,33 @@ claims.
   \url{https://tectonic-typesetting.github.io}.
 \item[{[12]}] P. Virtanen et al., SciPy 1.0: fundamental algorithms for scientific computing in Python, \emph{Nature Methods},
   17:261--272, 2020. SciPy version 1.18.1. Available: \url{https://scipy.org}.
-\item[{[13]}] J. W. Tukey, \emph{Exploratory Data Analysis}, Addison-Wesley, 1977.
-\item[{[14]}] M. Garland and P. S. Heckbert, Surface simplification using quadric error metrics, \emph{Proceedings of SIGGRAPH},
+\item[{[13]}] M. Douze et al., The Faiss library, arXiv:2401.08281, 2024. faiss-cpu version 1.15.1. Available:
+  \url{https://github.com/facebookresearch/faiss}. Used for the approximate nearest-neighbor search.
+\item[{[14]}] F. Pedregosa et al., Scikit-learn: Machine learning in Python, \emph{Journal of Machine Learning Research},
+  12:2825--2830, 2011. scikit-learn version 1.8.0. Available: \url{https://scikit-learn.org}. Used for t-SNE.
+\item[{[15]}] J. W. Tukey, \emph{Exploratory Data Analysis}, Addison-Wesley, 1977.
+\item[{[16]}] M. Garland and P. S. Heckbert, Surface simplification using quadric error metrics, \emph{Proceedings of SIGGRAPH},
   209--216, 1997.
-\item[{[15]}] J. Rossignac and P. Borrel, Multi-resolution 3D approximations for rendering complex scenes, in \emph{Modeling in
+\item[{[17]}] J. Rossignac and P. Borrel, Multi-resolution 3D approximations for rendering complex scenes, in \emph{Modeling in
   Computer Graphics}, Springer, 455--465, 1993.
-\item[{[16]}] A. C. Telea, Multimedia Retrieval, Module 4: Feature extraction, lecture slides, Utrecht University. Available:
+\item[{[18]}] A. C. Telea, Multimedia Retrieval, Module 4: Feature extraction, lecture slides, Utrecht University. Available:
   \url{https://webspace.science.uu.nl/~telea001/MR/Slides}.
-\item[{[17]}] A. C. Telea, Multimedia Retrieval, Technical tips: Step 3 (parts 1--3), Utrecht University. Available:
+\item[{[19]}] A. C. Telea, Multimedia Retrieval, Technical tips: Step 3 (parts 1--3), Utrecht University. Available:
   \url{https://webspace.science.uu.nl/~telea001/MR/TechnicalTips}.
-\item[{[18]}] A. C. Telea, Multimedia Retrieval, Module 5: Matching, lecture slides, Utrecht University. Available:
+\item[{[20]}] A. C. Telea, Multimedia Retrieval, Module 5: Matching, lecture slides, Utrecht University. Available:
   \url{https://webspace.science.uu.nl/~telea001/MR/Slides}.
-\item[{[19]}] A. C. Telea, Multimedia Retrieval, Technical tips: Step 4, Utrecht University. Available:
+\item[{[21]}] A. C. Telea, Multimedia Retrieval, Technical tips: Step 4, Utrecht University. Available:
   \url{https://webspace.science.uu.nl/~telea001/MR/TechnicalTips}.
-\item[{[20]}] A. C. Telea, Multimedia Retrieval, Module 7: Evaluation, lecture slides, Utrecht University. Available:
+\item[{[22]}] A. C. Telea, Multimedia Retrieval, Module 7: Evaluation, lecture slides, Utrecht University. Available:
   \url{https://webspace.science.uu.nl/~telea001/MR/Slides}.
-\item[{[21]}] A. C. Telea, Multimedia Retrieval -- Assignment, Utrecht University. Available:
-  \url{https://webspace.science.uu.nl/~telea001/MR/Assignment}.
-\item[{[22]}] A. C. Telea, Multimedia Retrieval, Module 5: Matching, lecture slides, Utrecht University. Available:
+\item[{[23]}] A. C. Telea, Multimedia Retrieval, Module 6: Scalability, lecture slides, Utrecht University. Available:
   \url{https://webspace.science.uu.nl/~telea001/MR/Slides}.
-\item[{[23]}] A. C. Telea, Multimedia Retrieval, Technical tips: Step 4, Utrecht University. Available:
+\item[{[24]}] Y. A. Malkov and D. A. Yashunin, Efficient and robust approximate nearest neighbor search using hierarchical
+  navigable small world graphs, \emph{IEEE Transactions on Pattern Analysis and Machine Intelligence}, 42(4):824--836, 2020.
+\item[{[25]}] L. van der Maaten and G. Hinton, Visualizing data using t-SNE, \emph{Journal of Machine Learning Research},
+  9:2579--2605, 2008.
+\item[{[26]}] A. C. Telea, Multimedia Retrieval, Technical tips: Step 5, Utrecht University. Available:
   \url{https://webspace.science.uu.nl/~telea001/MR/TechnicalTips}.
-\item[{[24]}] A. C. Telea, Multimedia Retrieval, Module 7: Evaluation, lecture slides, Utrecht University. Available:
-  \url{https://webspace.science.uu.nl/~telea001/MR/Slides}.
 \end{description}
 
 \end{document}
