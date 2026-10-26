@@ -1,13 +1,15 @@
 descriptor,end,class,file,value
-sphericity,low,PlantWildNonTree,m985.obj,0.0001746196496576
-sphericity,high,Bottle,m492.obj,0.4058916589484308
-3D rectangularity,low,Tree,D00727.obj,0.0052758193546391
-3D rectangularity,high,Computer,D01085.obj,0.5213506021627103
-convexity,low,Glasses,D00816.obj,0.0121675430513792
-convexity,high,HumanHead,m350.obj,0.9003627495834464
-eccentricity,low,House,m461.obj,1.5764215734466065
-eccentricity,high,Gun,m677.obj,712.23519664398
-diameter,low,Jet,m1293.obj,1.000017527689694
-diameter,high,Shelf,D00818.obj,1.2932271907475572
-surface area,low,Jet,m1276.obj,0.2015075670822336
-surface area,high,Wheel,m741.obj,5.841958612852784
+volume,low,Tree,m1072.obj,0.0006314870058624
+volume,high,Computer,m1774.obj,0.2302336969698869
+sphericity,low,BuildingNonResidential,m410.obj,0.0002293546023399
+sphericity,high,Bird,m50.obj,0.4126130843881128
+3D rectangularity,low,Glasses,D00730.obj,0.0062079328610036
+3D rectangularity,high,MultiSeat,D00053.obj,0.5140928114553478
+convexity,low,Glasses,D00883.obj,0.0176034571301312
+convexity,high,Bottle,D00020.obj,0.9000234011175576
+eccentricity,low,Vase,m541.obj,1.5716857016813648
+eccentricity,high,Knife,m726.obj,714.2612973664851
+diameter,low,Sword,D00149.obj,1.0000167826726845
+diameter,high,House,m461.obj,1.293556426363706
+surface area,low,Bird,m43.obj,0.2014273972700497
+surface area,high,Shelf,m844.obj,5.903117500360146

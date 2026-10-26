@@ -1,0 +1,67 @@
+STEP 2.4: RESAMPLING CHECK
+--------------------------------------------------
+Shapes in processing log: 2483
+Refined OBJ files found:  2483
+Shapes in the log without a file: 0
+Files that are not in the log:    0
+
+Processing actions:
+           Number of shapes
+action                     
+refined                1754
+kept                    367
+decimated               362
+
+Processing status:
+        Number of shapes
+status                  
+ok                  2483
+
+Vertex and face counts in the files equal to the log: 2483 / 2483
+
+Vertex count statistics:
+       original  after cleaning  after resampling
+count   2483.00         2483.00           2483.00
+mean    5609.78         5019.01           7440.82
+std     9851.16         8144.26            747.50
+min       16.00           16.00           5016.00
+25%      489.50          480.50           7156.00
+50%     1826.00         1724.00           7502.00
+75%     6306.50         6072.50           7784.00
+max    98256.00        73440.00           9961.00
+
+Target-range check (5,000-10,000 vertices):
+Shapes within range:  2483 / 2483
+Shapes outside range: 0
+
+Face count statistics:
+        original  after resampling
+count    2483.00           2483.00
+mean    10691.53          14322.30
+std     16191.23           1996.92
+min        16.00           3271.00
+25%       924.00          13751.50
+50%      3615.00          14646.00
+75%     13363.50          15294.50
+max    129881.00          24999.00
+
+Face-area coefficient of variation (per shape):
+       area_cv_before  area_cv_after
+count        2483.000       2483.000
+mean            3.986          2.339
+std             4.861          3.687
+min             0.025          0.136
+25%             1.449          0.689
+50%             2.459          1.087
+75%             4.541          2.116
+max            93.642         33.193
+
+Mesh quality after resampling:
+Shapes without orientation conflicts: 2412 / 2483
+Shapes without degenerate faces:      2463 / 2483
+Shapes without duplicate vertices:    2235 / 2483
+
+Viewer check (images in report/figures/step2/):
+  Bird     = Bird D00089.obj: refined, 233 -> 8,047 vertices
+  Humanoid = Humanoid m253.obj: decimated, 11,806 -> 7,559 vertices
+  Kept     = AircraftBuoyant m1338.obj: kept, 8,761 -> 8,761 vertices

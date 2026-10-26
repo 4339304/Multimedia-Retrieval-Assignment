@@ -1,11 +1,10 @@
 option,precision@10
-"one vector, min-max, no log",0.2812778002426203
-"one vector, standardized, no log",0.27399919126566924
-"one vector, standardized, log",0.30695511524464214
-only the histograms,0.21690254751314195
-"weighted descriptors, standardized, log",0.3192478770723817
-"weighted descriptors, min-max, log",0.3192478770723817
-"weighted descriptors, missing values set to the mean",0.3216740800646987
-"weighted descriptors, standardized, no log",0.28997169429842296
-"weighted descriptors, standardized, log of surface area and eccentricity only",0.31221188839466235
+"one vector, min-max, no log",0.2878689850384149
+"one vector, standardized, no log",0.2783663566518399
+"one vector, standardized, log",0.3106752931661949
+only the histograms,0.21500202183582692
+"weighted descriptors, standardized, log",0.32494945410432674
+"weighted descriptors, min-max, log",0.32494945410432674
+"weighted descriptors, standardized, no log",0.297573797007683
+"weighted descriptors, standardized, log of surface area and eccentricity only",0.3182369591589163
 random order (expected value),0.020608003329158797

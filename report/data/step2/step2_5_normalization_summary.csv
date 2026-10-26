@@ -1,0 +1,13 @@
+measurement,value
+Input shapes,2483
+Normalized OBJ files,2483
+Shapes verified,2483
+Shapes passing,2483
+Shapes failing,0
+Mean center error,1.9732293666637478e-14
+Maximum center error,3.489217240762594e-13
+Minimum largest dimension,1.0
+Maximum largest dimension,1.0000000000002
+All face counts preserved,True
+Normalization errors,0
+Verification errors,0
