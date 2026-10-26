@@ -42,6 +42,36 @@ Multimedia Retrieval assignment - code for Steps 1 to 4
        python run_step4.py --compare      compare the normalization and weighting options (about 1 minute)
        python figures_step4.py            figures for the report
 
+8. Step 5 - approximate nearest-neighbour search and t-SNE visualization:
+
+       python run_step5.py --build
+              build the HNSW approximate nearest-neighbour index
+
+       python run_step5.py --query Mug/D00685.obj --compare -k 10
+              query the ANN index and compare the results with Step 4
+
+       python run_step5.py --query HumanHead/D00591.obj --compare -k 10
+       python run_step5.py --query Computer/m1778.obj --compare -k 10
+       python run_step5.py --query Quadruped/D00795.obj --compare -k 10
+       python run_step5.py --query Hand/D01022.obj --compare -k 10
+              test five query shapes and record the ANN search time,
+              exact search time and recall@10
+
+       python run_step5.py --query Mug/D00685.obj --radius 2.7 --max-candidates 2473
+              perform a radius-based query for the Mug shape
+
+       python run_step5_tsne.py --perplexity 30 --iterations 1000 --seed 42
+              generate the two-dimensional t-SNE visualization
+
+       Results and index files are saved in:
+       report/data/step4/step5/
+
+       t-SNE screenshot:
+       report/data/step4/3d-shape-feature-database-t-sne-2d-embed.png
+
+       Validation logs and screenshot:
+       report/data/step4/step5/validation/
+
 Results:
    processed/step2_full/                        resampled shapes (Step 2.3)
    processed/step2_normalized/                  centered and scaled shapes (Step 2.5)
