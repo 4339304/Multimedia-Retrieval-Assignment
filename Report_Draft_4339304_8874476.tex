@@ -135,7 +135,9 @@ Step~5, the nearest-neighbor search with an HNSW index and the t-SNE map of the 
   \item Merging of duplicate vertices, parallel processing (Section~\ref{sec:resampling}), separate translation and scaling in
   Step~2.5 (Section~\ref{sec:s25}).
   \item Step~3.1: axis-aligned bounding box, the test procedure for shapes with unclear axes, and the normalization described
-  as projections, mirroring and scaling, which together form a linear map.
+  as projections, mirroring and scaling, which together form a linear map; the place of the resampling in the order of the
+  normalization steps is explained.
+  \item Step~4: why a fixed number $K$ of results is used and not a distance threshold (Section~\ref{sec:s4results}).
 \end{itemize}
 \clearpage
 
@@ -250,7 +252,7 @@ $D(M_1,M_2)$ & distance between two shapes & \ref{sec:s4dist}\\
 $M_q$, $K$ & query shape, number of returned shapes & \ref{sec:s4compare}\\
 $TP$, $FP$, PPV & returned shapes with and without the class of the query, precision & \ref{sec:s4compare}\\
 $h$, $h'$, $d_{\cos}$, $d_{\mathrm{EMD}}$ & two histograms of the same descriptor, cosine distance and Earth Mover's Distance between them & \ref{sec:s4metrics}\\
-$R$ & radius of a range query & \ref{sec:s5search}\\
+$R$ & radius (distance threshold) of a range query & \ref{sec:s4results}\\
 $\mathcal{A}_K$, $\mathcal{E}_K$, $\mathrm{Recall}@K$ & $K$ closest shapes found by the index and by the exact search, share of $\mathcal{E}_K$ found in $\mathcal{A}_K$ & \ref{sec:s5eval}\\
 \bottomrule\end{tabular}
 \caption{Notation used in this report.}\label{tab:notation}
@@ -1027,7 +1029,11 @@ After the alignment, the axis-aligned bounding box is the same as the oriented b
 The order is the one from the lecture slides and the technical tips. The translation comes first, because the projection and
 the moment test are computed around the origin. The flipping needs the aligned axes. The scaling comes last, because the
 axis-aligned bounding box changes with the alignment. Mirroring and scaling do not move the barycenter away from the origin, so the translation stays
-correct.
+correct. The resampling of Step~2.3 comes before all four steps, which is the order proposed in the technical tips~[19]. It does
+not change the position, orientation or size of a shape, but it does change its vertices. The barycenter
+(Eq.~\eqref{eq:step2barycenter}) and the covariance matrix (Eq.~\eqref{eq:covariance}) are means over the vertices, so
+computing them after the resampling, when the vertices are spread fairly evenly over the surface, makes them depend less on how
+densely each part of the original shape was modeled.
 
 \paragraph{Implementation.}
 The four steps are separate functions (\texttt{center}, \texttt{align}, \texttt{flip} and \texttt{scale}) in the file
@@ -1675,6 +1681,16 @@ shapes such as motorcycles. The closest shape to the Guitar is a guitar labeled 
 the class labels. In these cases the descriptors capture the overall form, but not the details that decide the class. Some
 results appear twice with the same distance, such as the two computers for the Bird (1.51) and the two doors for the Chess
 query (2.32); these are duplicated shapes of the database.
+
+\paragraph{Number of results or distance threshold.} The assignment allows two ways of choosing the results: the $K$ closest
+shapes, or all shapes closer to the query than a threshold~[1], here written as a radius $R$. A fixed $K$ is used here, because the distances of the
+closest shapes differ strongly between the queries (Figure~\ref{fig:s4queries}): from 0.66 to 0.86 for the five results of the
+Humanoid, but from 2.61 to 2.85 for the Sword. A threshold of $R=1$ would return five shapes for the Humanoid and the Jet but
+none at all for seven of the ten queries, and the threshold $R=2.61$ needed for the first result of the Sword would return
+350 shapes for the Humanoid. The distances of correct and wrong results also overlap: the correct results of the Sword are farther away than the
+wrong results of the Bird (1.50 to 1.58). A single $R$ can therefore not separate the right shapes from the wrong ones for all
+queries, while a fixed $K$ gives every query the same number of results and makes their precision comparable. A query by distance
+is part of Step~5 (Section~\ref{sec:s5search}).
 
 \begin{figure}[!htbp]\centering
 \includegraphics[width=0.92\linewidth]{s4_queries.png}
