@@ -1637,234 +1637,272 @@ case for missing values. For a query, $D$ is computed to all database shapes and
 the $K$ closest shapes are returned with their distance, in 0.06 seconds per query. The histogram distance in
 Eq.~\eqref{eq:s4dg} is a parameter of the program; Section~\ref{sec:s4metrics} uses this to test two other distance functions.
 
-\subsection{Choice of the Options}\label{sec:s4compare}
-The options were compared by using every database shape once as a query for all other shapes. For every query, the precision
-of the $K=10$ closest shapes was computed as defined in the lecture slides~[22],
+\subsection{Database-wide Comparison of Distance Metrics}\label{sec:s4compare}
+
+The first configuration experiments above helped select the feature normalization and descriptor weighting. We then compared three
+histogram-distance choices more systematically: Euclidean distance, cosine distance and Earth Mover's Distance (EMD). The comparison
+follows the matching and evaluation principles in the assignment and the course material on matching and evaluation~[1,20,22].
+The global descriptors, logarithmic transformation and descriptor-level weighting were kept the same. Only the distance used for each
+of the five 20-bin histograms was changed. For each metric, its descriptor-distance scales $\rho_g$ were estimated again from
+200,000 randomly sampled pairs, so that a change in the histogram distance did not leave it with an arbitrary weight.
+
+For this experiment, every one of the 2,483 rows in the feature table was used once as a query. The query row itself was excluded
+from its ranking, and the other shapes were sorted from smallest to largest combined distance. This is a leave-one-out, full-database
+evaluation; it is different from testing only the ten external query shapes described in Section~\ref{sec:s4query}. A result was
+considered relevant when its class label matched the query's class. This definition is reproducible and matches the class-label-based
+evaluation approach described for content-based retrieval in the assignment~[1]. It does not claim that every same-class object looks
+more similar to a person than every object from another class.
+
+For a query $q$, let $\mathcal{N}_K(q)$ be the set of its $K$ nearest database shapes after removing the query itself. Let
+$\mathbb{1}[c(x)=c(q)]$ equal one when retrieved shape $x$ has the same class as the query and zero otherwise. Precision at $K$ is
+therefore
 \begin{equation}
-\mathrm{PPV}=\frac{TP}{TP+FP}=\frac{TP}{K},
-\label{eq:s4ppv}
+  P@K(q)=\frac{1}{K}\sum_{x\in\mathcal{N}_K(q)}\mathbb{1}[c(x)=c(q)],
+  \qquad
+  \overline{P@K}=\frac{1}{N}\sum_{q=1}^{N}P@K(q).
+  \label{eq:s4precision}
 \end{equation}
-where $TP$ is the number of returned shapes with the class of the query $M_q$ and $FP$ the number of the others, and it was
-averaged over all queries. Table~\ref{tab:s4options} shows the result. The evaluation of the final system is the subject of a later step.
+Here $N=2,483$ and $K=10$. For example, if six of the ten retrieved shapes have the query's class, then $P@10(q)=6/10=0.6$. The
+mean is calculated across all queries, so every shape contributes equally to the final score.
 
 \begin{table}[htbp]\centering\small
-\begin{tabular}{@{}lr@{}}\toprule
-Option & PPV ($K=10$)\\\midrule
-one vector, min-max normalization & 0.288\\
-one vector, standardization & 0.278\\
-one vector, standardization with logarithm & 0.311\\
-only the five histograms & 0.215\\
-weighted descriptors, no logarithm & 0.298\\
-weighted descriptors, logarithm only for surface area and eccentricity & 0.318\\
-\textbf{weighted descriptors, logarithm, standardization (used)} & \textbf{0.325}\\
-weighted descriptors, logarithm, min-max normalization & 0.325\\\midrule
-random order & 0.021\\
+\begin{tabular}{@{}lrrr@{}}\toprule
+Histogram distance & Mean $P@10$ & Std. dev. & Queries\\\midrule
+Cosine & \textbf{0.3272} & 0.2907 & 2,483\\
+Euclidean & 0.3262 & 0.2999 & 2,483\\
+EMD & 0.3239 & 0.2958 & 2,483\\
 \bottomrule\end{tabular}
-\caption{Precision of the ten closest shapes, averaged over all 2,473 database shapes as queries. ``One vector'' is the plain
-Euclidean distance between the full feature vectors; ``weighted descriptors'' is Eq.~\eqref{eq:s4D}.}
-\label{tab:s4options}
-\end{table}
-
-The logarithm and the weighting both improve the result, and the global descriptors add a lot compared with the histograms alone.
-With the weights, min-max normalization and standardization give the same result, because dividing by $\rho_g$ cancels any linear
-change of a descriptor. All options are far better than a random order, but on average only about three of the ten closest shapes have
-the right class.
-
-\subsection{Query Results}\label{sec:s4results}
-Figure~\ref{fig:s4queries} shows the ten outside queries with their five closest shapes; 24 of the 50 results have the class of
-the query. The Humanoid gets five correct shapes and the Bicycle, Jet and Sword four, because the shapes of these classes are
-similar to each other and different from most other shapes. The Mug finds three mugs and a vase with a similar round body, and
-the Tree two trees. The Bird and the Chess query get none; for most of the mistakes the figure shows why. The Chess query is a
-flat chess board and is matched with other flat shapes such as a shelf, signs and doors. The Bird is a coarse, compact model
-and is matched with other compact shapes such as a head and two computers. The Car finds only one car and otherwise long, low
-shapes such as motorcycles. The closest shape to the Guitar is a guitar labeled Musical\_Instrument, so this mistake comes from
-the class labels. In these cases the descriptors capture the overall form, but not the details that decide the class. Some
-results appear twice with the same distance, such as the two computers for the Bird (1.51) and the two doors for the Chess
-query (2.32); these are duplicated shapes of the database.
-
-\paragraph{Number of results or distance threshold.} The assignment allows two ways of choosing the results: the $K$ closest
-shapes, or all shapes closer to the query than a threshold~[1], here written as a radius $R$. A fixed $K$ is used here, because the distances of the
-closest shapes differ strongly between the queries (Figure~\ref{fig:s4queries}): from 0.66 to 0.86 for the five results of the
-Humanoid, but from 2.61 to 2.85 for the Sword. A threshold of $R=1$ would return five shapes for the Humanoid and the Jet but
-none at all for seven of the ten queries, and the threshold $R=2.61$ needed for the first result of the Sword would return
-350 shapes for the Humanoid. The distances of correct and wrong results also overlap: the correct results of the Sword are farther away than the
-wrong results of the Bird (1.50 to 1.58). A single $R$ can therefore not separate the right shapes from the wrong ones for all
-queries, while a fixed $K$ gives every query the same number of results and makes their precision comparable. A query by distance
-is part of Step~5 (Section~\ref{sec:s5search}).
-
-\begin{figure}[!htbp]\centering
-\includegraphics[width=0.92\linewidth]{s4_queries.png}
-\caption{The ten query shapes from outside the database (left, blue) with their five closest database shapes and the distance
-$D$. Green: same class as the query, red: another class. Shapes are shown in their normalized pose; for nearly balanced
-shapes, such as one bicycle and one motorcycle, the moment test chooses the direction by a very small margin, so they appear
-upside down (Section~\ref{sec:normalization}).}
-\label{fig:s4queries}
-\end{figure}
-
-\subsection{Cosine Distance and Earth Mover's Distance}\label{sec:s4metrics}
-Besides the Euclidean distance, the assignment names the cosine distance and the Earth Mover's Distance (EMD) as options~[1], and
-both are introduced in the lecture slides~[20]. They were tested as the histogram distance of Eq.~\eqref{eq:s4dg}. The global
-descriptors, the normalization and the weighting stay the same, and the spread $\rho_g$ of every histogram distance is measured
-again for the new distance. For two histograms $h=(h_1,\ldots,h_B)$ and $h'=(h'_1,\ldots,h'_B)$ of the same descriptor,
-\begin{equation}
-d_{\cos}(h,h')=1-\frac{\sum_{j=1}^{B}h_j\,h'_j}{\lVert h\rVert\,\lVert h'\rVert},\qquad
-d_{\mathrm{EMD}}(h,h')=\frac{1}{B-1}\sum_{j=1}^{B-1}\Big|\sum_{i=1}^{j}\big(h_i-h'_i\big)\Big| .
-\label{eq:s4metrics}
-\end{equation}
-The cosine distance compares only the direction of the two histograms seen as vectors and not their length. It is not a true
-metric, because the triangle inequality does not hold for it~[20]. The EMD measures how much of one histogram has to be moved,
-and how far, to turn it into the other one. For two histograms with the same bins and the same total, this is the summed
-difference of their cumulative sums, and the division by $B-1$ makes it relative to the range of the histogram. Unlike the
-Euclidean and the cosine distance, the EMD does not count two histograms as completely different when their peaks are shifted by
-one bin. Both distances are implemented in \path{run_step4_metrics.py}.
-
-The two distances were compared on the ten query shapes of Section~\ref{sec:s4query}, with the precision of the $K=5$ and $K=10$
-closest shapes (Table~\ref{tab:s4metrics}). For comparison, the table also gives the Euclidean distance on the same queries. On
-these queries the EMD gives a higher mean precision than the cosine distance for both values of $K$, 0.48 against 0.43 for $K=10$,
-and about the same as the Euclidean distance. The standard deviations are large and only ten queries were used, so the
-differences are a first indication and not a final result.
-
-\begin{table}[htbp]\centering\small
-\begin{tabular}{@{}lcc@{}}\toprule
-Histogram distance & PPV ($K=5$) & PPV ($K=10$)\\\midrule
-Euclidean (Section~\ref{sec:s4dist}) & 0.48 (0.37) & 0.45 (0.38)\\
-cosine & 0.40 (0.31) & 0.43 (0.32)\\
-EMD & 0.48 (0.38) & 0.48 (0.34)\\
-\bottomrule\end{tabular}
-\caption{Precision of the closest shapes for the ten query shapes with three histogram distances: mean and, in brackets,
-standard deviation over the queries.}
+\caption{Leave-one-out Precision@10 over the full feature table. The standard deviation describes variation between individual query scores.}
 \label{tab:s4metrics}
 \end{table}
 
-\subsection{Discussion and Conclusion}
-The global descriptors are standardized after taking the logarithm of all of them except the diameter, and the normalized feature
-table is stored. A query shape from outside the database is processed like the database and gives the same features. The weighted
-Euclidean distance performed best of the tested options and answers a query in 0.06 seconds. Its main weakness is that histograms
-are compared bin by bin, so two similar histograms that are shifted by one bin count as different; this is one reason why the
-histograms alone give a low precision. The EMD avoids this problem, and on the ten query shapes it gave a higher precision than
-the cosine distance (Section~\ref{sec:s4metrics}). In addition, all descriptors get the same weight although some separate the classes
-better than others, and the volume-based descriptors are only estimates for many shapes. Giving every shape a volume, even a
-rough one, keeps the distance simple, because no special case for missing values is needed. The duplicated shapes make the values of
-Table~\ref{tab:s4options} slightly too high.
+\begin{figure}[htbp]\centering
+\includegraphics[width=0.78\linewidth]{s4_metric_comparison.png}
+\caption{Mean Precision@10 for the three histogram-distance choices, evaluated on all 2,483 shapes. The differences are small.}
+\label{fig:s4metricplot}
+\end{figure}
+
+Cosine distance obtained the highest observed mean Precision@10 (0.3272, or 32.72\%), followed closely by Euclidean distance
+(32.62\%) and EMD (32.39\%). The absolute gap between the highest and lowest means is only 0.0033, or about one third of a percentage
+point. We therefore do not treat this as evidence that cosine is statistically superior; no significance test was carried out.
+The relatively large standard deviations show that the difficulty varies considerably between queries. Some classes have clear
+neighbors in the feature space, while others overlap with several different classes.
+
+\paragraph{Why the three formulas behave differently.}
+For two histograms $h=(h_1,\ldots,h_B)$ and $h'=(h'_1,\ldots,h'_B)$, cosine distance is
+\begin{equation}
+ d_{\cos}(h,h')=1-\frac{\sum_{j=1}^{B}h_jh'_j}
+ {\sqrt{\sum_{j=1}^{B}h_j^2}\sqrt{\sum_{j=1}^{B}(h'_j)^2}}.
+ \label{eq:s4cosine}
+\end{equation}
+It compares the direction of the histogram vectors. Histograms with similar relative patterns can receive a small cosine distance,
+even when their magnitudes differ. Our histograms are normalized frequency distributions, so their total mass is already one. If both
+histograms are empty, the implementation treats them as equal; otherwise the denominator is well-defined for the non-empty histograms.
+
+The EMD implementation uses the cumulative difference between corresponding bins:
+\begin{equation}
+ d_{\mathrm{EMD}}(h,h')=\frac{1}{B-1}\sum_{j=1}^{B-1}
+ \left|\sum_{i=1}^{j}(h_i-h'_i)\right|.
+ \label{eq:s4emd}
+\end{equation}
+This form assumes equal-width, ordered bins and histograms with equal total mass. The inner sum tells how much probability mass has
+accumulated as we move through the bins; the absolute value measures the imbalance at that point. Summing these imbalances reflects
+how much mass would need to be shifted across the histogram to transform one distribution into the other. Dividing by $B-1$ scales
+the result by the number of bin intervals. For our histograms, $B=20$. Unlike a bin-by-bin Euclidean comparison, EMD can give a modest
+distance when a peak moves into a neighboring bin, because the distributions are adjacent rather than unrelated.
+
+For Euclidean distance, the histogram component is
+\begin{equation}
+ d_{2}(h,h')=\sqrt{\sum_{j=1}^{B}(h_j-h'_j)^2}.
+ \label{eq:s4hist_euclidean}
+\end{equation}
+It directly measures the bin-wise difference. A shift of a peak changes the values in both the bin it leaves and the bin it enters,
+so Euclidean distance can penalize that shift without considering that the bins are neighbors. Cosine distance captures profile direction,
+while EMD explicitly uses the ordering of bins. None is universally best: the observed overall differences here are small, and the
+best metric can depend on the shape class and on how its descriptor distributions vary.
+
+The final system combines the histogram distances with the global-descriptor distances using the same descriptor-level scaling as
+Eq.~\eqref{eq:s4D}. If $d_g$ is the distance for descriptor $g$ and $\rho_g$ is its empirically measured spread, then
+\begin{equation}
+ D(q,x)=\sqrt{\sum_{g\in\mathcal{G}}\left(\frac{d_g(q,x)}{\rho_g}\right)^2}.
+ \label{eq:s4combined}
+\end{equation}
+This matters because the final ranking is not based on one histogram in isolation: all six global descriptors and all five histograms
+contribute after their distances have been put on comparable scales.
+
+\paragraph{Class-wise interpretation.}
+The class-wise CSV shows that no metric wins for every class. EMD gave higher class-level mean Precision@10 for Bicycle (0.7115),
+Chess (0.6071), Glasses (0.6750) and Fish (0.5350). Euclidean distance performed best for Jet (0.6594) and Humanoid (0.6430),
+while cosine performed best for HumanHead (0.6647) and Sword (0.6132). These examples help explain why the overall means are close:
+metrics can reorder a class's neighbors differently, but the gains for some categories are offset by losses in others. The per-query,
+summary and class-wise values are saved in \path{report/data/step4/metric_comparison_per_query.csv},
+\path{report/data/step4/metric_comparison_summary.csv} and
+\path{report/data/step4/metric_comparison_by_class.csv}, respectively.
+
+\subsection{Discussion and Conclusion}\label{sec:s4discussion}
+The feature normalization and the weighted combination make descriptors with very different numerical ranges usable in one ranking.
+The full-database comparison gives a more stable overview than the earlier ten-query comparison, because all 2,483 shapes are evaluated
+as queries. Cosine distance has the highest observed average, but the improvement is very small and should not be presented as a
+significant win. Class labels are only a proxy for visual relevance: a shape can be geometrically similar to an object from another
+class, and duplicate or near-duplicate models can make some queries easier. In addition, the volume-based descriptors are estimates
+for some imperfect meshes, which can affect their reliability. A useful next improvement would be to study descriptor weights and
+near-duplicate handling, and to complement class-based precision with human inspection of representative retrievals.
 
 % =============================================================================================
 \section{Step 5: Scalability}\label{sec:step5}
 % =============================================================================================
 
 \subsection{Aim}
-In Step~4 a query is compared with every shape of the database, which gives an exact ranking but takes time in proportion to
-the size of the database. Step~5 adds two things that the assignment asks for~[1]: a spatial search structure that finds the
-nearest shapes of a query without comparing it with every shape, for a given number $K$ of shapes or for all shapes within a
-radius $R$, and a two-dimensional map of the whole feature database, made with t-SNE, in which every shape is a point. Both
-methods are covered in the lecture slides on scalability~[23].
+Step~4 ranks a query by comparing it with every database vector. This exact approach is straightforward and gives a reference ranking,
+but its work grows with the number of database shapes. Step~5 addresses the assignment's scalability requirements by adding an
+approximate nearest-neighbor (ANN) search structure for $K$-nearest-neighbor queries and radius-based range queries, and a two-dimensional
+t-SNE view of the feature database~[1,23,26]. The two parts answer different questions: ANN is intended to retrieve likely neighbors
+quickly, while t-SNE gives an interactive overview of similarities and overlaps in the descriptor space.
 
-\subsection{Feature Vectors}\label{sec:s5vectors}
-Every shape of the database (2,473 shapes) is described by one vector of 106 values: the six normalized global descriptors of
-Section~\ref{sec:s4norm} and the five histograms of 20 bins. Every descriptor is divided by the spread $\rho_g$ of its distances
-(Table~\ref{tab:s4params}). The Euclidean distance between two such vectors is then exactly the distance $D$ of
-Eq.~\eqref{eq:s4D}, so the search structure and the exact search of Step~4 use the same distance. The class and file name of
-every vector are stored separately, so that a result can be traced back to its shape. A query shape is turned into a vector in
-the same way, with the normalization parameters of the database. Because every shape has all descriptors
-(Section~\ref{sec:descriptors}), every vector is complete. For 40 random shapes compared with all database shapes, the distances
-computed from the vectors agree with Eq.~\eqref{eq:s4D} up to $6\cdot10^{-6}$, the rounding error of storing the vectors in single
-precision.
+\subsection{Feature Vectors and Distance Preservation}\label{sec:s5vectors}
+The index contains 2,473 database shapes, because the ten external query shapes are held out from the retrieval database. Each shape
+is represented by a 106-dimensional vector: six normalized global descriptors plus five histograms with 20 bins each
+($6+5\times20=106$). The class and file name are stored alongside each vector so every result can be traced back to its mesh.
 
-\subsection{Spatial Search Structure}\label{sec:s5search}
-The vectors are stored in a Hierarchical Navigable Small World (HNSW) graph~[24], built with the FAISS library~[13]. Every
-vector is a node, linked to some of its nearest neighbors, and the graph has several layers with fewer nodes in the higher
-layers. A search starts in the top layer, moves to the neighbor closest to the query and continues layer by layer, so that only
-a small part of the vectors is compared with the query. The method is approximate: it can miss a true neighbor, and the chance
-of this is controlled by the size of the candidate list during the search. The graph is built with 16 links per node and a
-candidate list of 200 (\texttt{efConstruction}), and searched with a candidate list of 100 (\texttt{efSearch}). The index is saved
-to disk together with the vectors and the shape names, and it is built again automatically when the features of Step~4 change.
+To keep the ANN results comparable with Step~4, the vector components are scaled by the same descriptor distance spreads $\rho_g$
+used in Eq.~\eqref{eq:s4D}. In effect, the stored vector contains each descriptor after its contribution has been divided by its
+empirical distance scale. The ordinary Euclidean distance between two stored vectors therefore corresponds to the weighted distance
+used for the exact ranking, up to floating-point rounding. A check on 40 randomly selected shapes found a maximum discrepancy of
+$6\times10^{-6}$ between the vector distance and Eq.~\eqref{eq:s4D}. This check is important: if the indexed vectors used a different
+scaling or distance, the approximate search would be solving a different retrieval problem.
 
-Two kinds of queries are supported, as asked in the assignment~[1]. A $K$-nearest-neighbor query asks the index for the $K$
-closest vectors, plus a few extra so that the query itself can be left out when it is a database shape. A range query returns
-all shapes whose distance to the query is at most $R$. The index has no direct range search, so it is asked for a fixed number
-of nearest candidates (200 by default, or the whole database), and the candidates within the radius are kept. This finds all
-shapes within the radius as long as there are fewer of them than candidates.
+\subsection{HNSW Approximate Nearest-Neighbor Index}\label{sec:s5search}
+The feature vectors are indexed with a Hierarchical Navigable Small World (HNSW) graph using FAISS~[13,24]. In an HNSW index,
+each vector is a node connected to a selection of nearby vectors. The graph has multiple layers: the upper layers contain fewer nodes
+and help the search move quickly across the space, while the lower layers refine the search around promising candidates. Instead of
+calculating the distance to every vector, the algorithm explores a subset of the graph. This usually saves time, but the result is
+approximate because a true nearest neighbor can be missed.
 
-\subsection{Evaluation of the Search}\label{sec:s5eval}
-The results of the index were compared with the exact search of Step~4. If $\mathcal{A}_K$ is the set of the $K$ closest shapes
-found by the index and $\mathcal{E}_K$ the set found by the exact search, the recall is
+The configured index uses 16 links per node, an insertion candidate setting of $efConstruction=200$, and a search candidate setting
+of $efSearch=100$. The first setting affects graph construction; the second controls how many promising candidates are considered
+while searching. Larger search effort generally improves the chance of finding exact neighbors but increases query time. The index,
+feature vectors and shape metadata are stored so the system can rebuild or query the same representation.
+
+For a $K$-nearest-neighbor query, the index returns the closest candidates and the query itself is removed when it is a database shape.
+For a radius query, the system requests a candidate set and keeps only shapes satisfying $D(q,x)\le R$. Since the HNSW search API used
+here does not directly enumerate every vector inside a radius, a range query can miss valid shapes if the candidate list is too small.
+Requesting more candidates reduces this risk at the cost of additional work. This distinction is important: a radius filter applied to
+an incomplete candidate list is not guaranteed to be an exhaustive range search.
+
+\subsection{Evaluation of $K$-Nearest-Neighbor Search}\label{sec:s5eval}
+We compared the ANN index with an exact search over the same 2,473 stored vectors, using $K=10$, $efSearch=100$, and three repetitions
+of the timing experiment. The reported measurements cover searches over preloaded vectors and an already built index; they exclude
+feature extraction and index loading. If $\mathcal{A}_K(q)$ is the set returned by ANN and $\mathcal{E}_K(q)$ is the exact top-$K$ set,
+recall is
 \begin{equation}
-\mathrm{Recall}@K=\frac{\card{\mathcal{A}_K\cap\mathcal{E}_K}}{\card{\mathcal{E}_K}},
-\label{eq:s5recall}
+ \operatorname{Recall}@K(q)=
+ \frac{|\mathcal{A}_K(q)\cap\mathcal{E}_K(q)|}{|\mathcal{E}_K(q)|}.
+ \label{eq:s5recall}
 \end{equation}
-which is 1 when the index finds every shape that the exact search finds. Five database shapes were used as test queries
-(Table~\ref{tab:s5timing}). For all five, the recall for $K=10$ is 1. The time of the exact search was measured as a call of the
-query function of Step~4, which also reads the stored feature table from disk, and the time of the index only for the search
-itself. Measured in this way, the index was 84 to 690 times faster. In addition, every database shape was used once as a query:
-for all 2,473 shapes the index returns the same ten closest shapes as the exact search.
+With $K=10$, the denominator is ten. A recall of 1 means that the ANN result contains all ten exact neighbors; lower values indicate
+that one or more exact neighbors were missed. This metric measures agreement with exact search, not whether the exact ranking itself
+matches human perception.
 
 \begin{table}[htbp]\centering\small
-\begin{tabular}{@{}lrrrr@{}}\toprule
-Query & Index (ms) & Exact search (ms) & Speed-up & $\mathrm{Recall}@10$\\\midrule
-Mug D00685 & 1.07 & 89.0 & 84 & 1.0\\
-HumanHead D00591 & 0.26 & 77.0 & 299 & 1.0\\
-Computer m1778 & 0.25 & 80.5 & 317 & 1.0\\
-Quadruped D00795 & 1.18 & 118.9 & 101 & 1.0\\
-Hand D01022 & 0.38 & 264.3 & 690 & 1.0\\
+\begin{tabular}{@{}lrr@{}}\toprule
+Measurement & HNSW ANN & Exact vector search\\\midrule
+Mean batch time (ms) & 66.53 & 258.35\\
+Median batch time (ms) & 60.19 & 210.09\\
+Mean time per query (ms) & 0.02690 & 0.10447\\
+Mean Recall@10 & 1.000 & 1.000\\
 \bottomrule\end{tabular}
-\caption{Search time of the index and of the exact search of Step~4 (including reading the feature table), speed-up and recall of
-the ten closest shapes for five test queries.}
+\caption{Full-database nearest-neighbor benchmark over 2,473 queries, with $K=10$, $efSearch=100$, and three repetitions. Times are for the preloaded search structures and vectors.}
 \label{tab:s5timing}
 \end{table}
 
-Table~\ref{tab:s5mug} shows the result of the index for the Mug D00685. None of its ten closest shapes is a mug; the closest are
-two human heads, two computers and a quadruped. The search finds the shapes whose descriptors are closest, and shapes of different
-classes can have similar descriptors. The other four test queries were taken from this list (ranks 1, 2, 4 and 8), so the five
-queries cover five classes that lie close together in the feature space.
+\begin{figure}[htbp]\centering
+\includegraphics[width=0.78\linewidth]{s5_timing_comparison.png}
+\caption{Mean total batch time for the approximate HNSW search and exact vector search. Both methods returned the same top ten for this benchmark.}
+\label{fig:s5timingplot}
+\end{figure}
 
-\begin{table}[htbp]\centering\small
-\begin{tabular}{@{}rllr@{}}\toprule
-Rank & Class & File & Distance $D$\\\midrule
-1 & HumanHead & D00591 & 2.361\\
-2 & Computer & m1778 & 2.482\\
-3 & Computer & D01067 & 2.485\\
-4 & Quadruped & D00795 & 2.505\\
-5 & HumanHead & D00488 & 2.572\\
-6 & Apartment & D00086 & 2.597\\
-7 & Hand & m330 & 2.625\\
-8 & Hand & D01022 & 2.631\\
-9 & ClassicPiano & D00190 & 2.635\\
-10 & HumanHead & m353 & 2.654\\
-\bottomrule\end{tabular}
-\caption{The ten closest shapes of the Mug D00685 found by the index.}
-\label{tab:s5mug}
-\end{table}
+The observed mean speed-up is
+\begin{equation}
+ S=\frac{T_{\mathrm{exact}}}{T_{\mathrm{ANN}}}
+ =\frac{258.35377\ \mathrm{ms}}{66.52887\ \mathrm{ms}}\approx 3.88.
+ \label{eq:s5speedup}
+\end{equation}
+Thus, in this benchmark, HNSW took about 25.7\% of the exact search time, a reduction of approximately 74.3\%. Both approaches had
+mean Recall@10 equal to 1.0, meaning the ANN results matched the exact top ten for the tested full-database benchmark. This is an
+observed result for the current dataset and parameter setting, not a guarantee that HNSW will always have perfect recall on larger
+databases or under different settings. Only three timing repetitions were used, and the measurements do not include loading or
+feature-extraction costs; these limits should be kept in mind when interpreting the speed-up.
 
-The range query was tested with the same Mug and $R=2.7$, with the whole database as candidates. The exact search finds 11 shapes
-within this radius, apart from the query itself, and the index returns the same 11 shapes.
+\subsection{Radius-Query Evaluation}\label{sec:s5radius}
+For range search, a result is accepted when its combined distance is no greater than a user-selected radius $R$. Let $\mathcal{E}_R(q)$
+be the exact set inside the radius and $\mathcal{A}_R(q)$ be the set returned by the ANN candidate search after applying the same radius
+filter. We report
+\begin{equation}
+ \operatorname{Recall}_R(q)=\frac{|\mathcal{A}_R(q)\cap\mathcal{E}_R(q)|}{|\mathcal{E}_R(q)|},\qquad
+ \operatorname{Precision}_R(q)=\frac{|\mathcal{A}_R(q)\cap\mathcal{E}_R(q)|}{|\mathcal{A}_R(q)|}.
+ \label{eq:s5radiusmetrics}
+\end{equation}
+Recall measures how many of the exact in-radius matches were recovered; precision measures how many returned items really satisfy the
+exact radius condition. When the exact or returned set is empty, the corresponding ratio is undefined and should not be interpreted as
+zero performance.
 
-\subsection{Map of the Database with t-SNE}\label{sec:s5tsne}
-The vectors have 106 dimensions and cannot be plotted directly. t-SNE~[25] places every vector as a point in two dimensions so
-that vectors that are close to each other in the feature space are also close in the plot; distances between points that are far
-apart are not preserved~[23]. The implementation of scikit-learn~[14] was used, with perplexity 30, 1,000 iterations, an initial
-layout from PCA, an automatic learning rate, the Barnes--Hut approximation and the random seed 42. The perplexity lies in the range
-of 30 to 40 recommended in the technical tips~[26], and the computation takes about 17 seconds for the whole database. The program
-writes an interactive plot in which every point is colored by its class and shows the class and file name of its shape when the
-mouse is moved over it.
-
-Figure~\ref{fig:s5tsne} shows the map. Six classes form compact groups: glasses, computer keyboards, fish, bicycles, human heads
-and shelves. Most other classes are spread over large parts of the map and overlap, which agrees with the precision of about 0.3
-in Step~4: for many classes, the descriptors do not separate them from other classes. The map is meant for exploring the
-database. It does not measure the quality of the retrieval, because t-SNE keeps the neighborhoods but changes the large
-distances.
+Five representative queries were checked at radii 1.0, 1.5 and 2.0, with candidate limits of 200 and 2,473. Most non-empty cases
+had full recall. At radius 2.0, the Car query had exact count 137 and ANN count 134, with 134 shared matches; its recall was 0.9781
+and precision 1.0. For the Jet query, the exact count was 171 and ANN returned 169, all of which were exact matches; recall was
+0.9883 and precision 1.0. The missed Car matches included a Quadruped and two Car shapes, while the missed Jet matches included a
+Humanoid and a Helicopter. This illustrates the limitation of finite candidate traversal: even when the candidate limit is set to the
+database size, the graph search does not necessarily enumerate every point within a radius. For the Insect query at radius 1.0, there
+were no matching items; precision and recall are therefore undefined for that case.
 
 \begin{figure}[htbp]\centering
-\includegraphics[width=0.85\linewidth]{s5_tsne.png}
-\caption{t-SNE map of the 2,473 database shapes. The six most compact classes with at least 20 shapes are colored (number of
-shapes in brackets); all other shapes are grey. The interactive version colors every class and shows the shape under the mouse.}
+\includegraphics[width=0.78\linewidth]{s5_radius_recall.png}
+\caption{Recall for the two representative radius-query cases at $R=2.0$. Both cases have precision 1.0, but the ANN candidate search misses a small number of exact matches.}
+\label{fig:s5radiusplot}
+\end{figure}
+
+\subsection{Two-Dimensional Feature Map with t-SNE}\label{sec:s5tsne}
+The 106-dimensional vectors cannot be inspected directly as a conventional scatterplot. We therefore used t-distributed stochastic
+neighbor embedding (t-SNE) to map the vectors into two dimensions~[25]. At a high level, t-SNE converts distances in the original
+space into neighborhood probabilities, then finds a 2D arrangement whose neighborhood probabilities are similar. Its objective is
+commonly expressed as minimizing the Kullback--Leibler divergence between the high-dimensional similarities $P$ and the low-dimensional
+similarities $Q$:
+\begin{equation}
+ \operatorname{KL}(P\|Q)=\sum_i\sum_j p_{ij}\log\frac{p_{ij}}{q_{ij}}.
+ \label{eq:s5tsnekl}
+\end{equation}
+This objective strongly discourages separating points that were close neighbors in the original feature space. However, t-SNE does
+not preserve all global distances: the distance between two widely separated groups on the plot should not be read as a calibrated
+measure of how dissimilar the groups are.
+
+The implementation uses scikit-learn, a PCA-based initial layout, a fixed random seed, and perplexity values of 30 and 40 for two
+views of the same database. Perplexity controls the effective neighborhood size considered by t-SNE; it is not a class count or a
+retrieval threshold. The resulting interactive HTML plots color points by class and expose the class and file name when a point is
+hovered. The static overview used in the report is shown in Figure~\ref{fig:s5tsne}; the interactive plots are saved as
+\path{tsne_shapes_p30.html} and \path{tsne_shapes_p40.html}.
+
+\begin{figure}[htbp]\centering
+\includegraphics[width=0.88\linewidth]{s5_tsne.png}
+\caption{Static view of the t-SNE embedding of the 2,473 indexed shapes. Each point represents one shape; class colors and hover details are available in the interactive HTML version.}
 \label{fig:s5tsne}
 \end{figure}
 
+The map is useful for exploring class overlap and finding groups that occupy similar regions of feature space. It is not a replacement
+for the quantitative retrieval evaluation: the map is a nonlinear projection, and visual separation does not directly prove high
+Precision@10. The perplexity-30 and perplexity-40 plots should be interpreted as two views of the neighborhood structure, not as two
+independent retrieval experiments.
+
 \subsection{Discussion and Conclusion}
-The HNSW index returns the same shapes as the exact search of Step~4 and supports both $K$-nearest-neighbor and range queries. It
-uses the same distance as Step~4, because the vectors are scaled with the same weights. The evaluation of the speed is limited:
-only five queries were timed, and the time of the exact search includes reading the feature table, while the time of the index
-does not. The range query was tested for one query only. The t-SNE map shows that a few classes form clear groups, while most
-classes overlap. It complements the precision values of Step~4, but it is not a quantitative evaluation of the system.
+Step~5 adds the two functions requested by the assignment: an ANN index for $K$-nearest-neighbor and radius-based queries, and an
+interactive two-dimensional map of the feature database. The HNSW benchmark returned the same top ten as exact vector search for all
+2,473 database queries in the reported run, with a measured mean speed-up of about 3.88 times. The radius tests also achieved high
+recall in most tested cases, but the Car and Jet examples show that a finite graph traversal can omit valid in-radius matches.
+Increasing the candidate effort is a practical way to trade some speed for more complete results.
+
+The performance numbers should be read with their experimental limits: timing used three repetitions and excluded feature extraction,
+loading and index construction; radius evaluation used five representative queries; and the index is approximate by design. The t-SNE
+map adds an intuitive way to inspect local neighborhoods and class overlap, but it cannot prove retrieval quality on its own. Taken
+together with Step~4, these results show the trade-off at the center of scalable retrieval: exact search provides a reference ranking,
+while HNSW can substantially reduce search time for this database while retaining the same top-ten results in the measured experiment.
 
 \clearpage
 \section*{References}

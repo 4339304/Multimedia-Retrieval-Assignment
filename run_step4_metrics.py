@@ -83,47 +83,124 @@ def query_with_metric(features, k=5, metric_name="cosine"):
                          "file": norm["file"].iloc[order].to_numpy(), "distance": distances[order]})
 
 
-def compare_metrics(k=10):
-    """Precision of the K = 5 and K = k closest shapes for the query shapes, for both distances."""
-    if not s4.QUERY_CSV.exists():
-        raise FileNotFoundError(f"{s4.QUERY_CSV} not found, run: python run_step4.py --build")
-    queries = pd.read_csv(s4.QUERY_CSV)
-    if not {"class", "file"}.issubset(queries.columns):
-        raise ValueError("query_shapes.csv needs the columns class and file")
-    ks = sorted({5, k})
-    rows = []
-    print(f"{len(queries)} query shapes ...", flush=True)
-    for _, query in queries.iterrows():
-        query_class, query_file = str(query["class"]), str(query["file"])
-        features = s4.features_for(f"{query_class}/{query_file}")
-        for metric_name in METRICS:
-            results = query_with_metric(features, k=max(ks), metric_name=metric_name)
-            for current_k in ks:
-                top = results.head(current_k)
-                relevant = int((top["class"].astype(str) == query_class).sum())
-                rows.append({"query_class": query_class, "query_file": query_file, "metric": metric_name,
-                             "k": current_k, "relevant_count": relevant, "returned_count": len(top),
-                             "precision_at_k": relevant / len(top) if len(top) else 0.0})
 
-    details = pd.DataFrame(rows)
+def compare_metrics(k=10):
+    """
+    Leave-one-out evaluation on the full feature table.
+    Compares Euclidean, cosine distance and EMD using Precision@k.
+    The query shape itself is excluded from its retrieved results.
+    """
+    table = pd.read_csv(s4.FEATURES_CSV)
+
+    required = {"class", "file"}
+    if not required.issubset(table.columns):
+        raise ValueError("Feature table must contain class and file columns")
+
+    if len(table) < 2:
+        raise ValueError("At least two shapes are required")
+
+    # Use every shape; do not remove the 10 held-out query shapes.
+    table = table.reset_index(drop=True)
+
+    # Fit normalization using the complete evaluation collection.
+    params = s4.fit_normalization(table)
+    norm = s4.apply_normalization(table, params)
+    norm = norm.reset_index(drop=True)
+
+    classes = norm["class"].astype(str).to_numpy()
+    files = norm["file"].astype(str).to_numpy()
+    k_eff = min(k, len(norm) - 1)
+
+    metrics = {
+        "euclidean": s4.euclidean,
+        "cosine": cosine_distance,
+        "emd": earth_movers_distance,
+    }
+
+    output_rows = []
+
+    print(
+        f"Evaluating {len(norm)} shapes with leave-one-out "
+        f"retrieval, Precision@{k_eff}...",
+        flush=True,
+    )
+
+    for metric_name, hist_metric in metrics.items():
+        print(f"Evaluating {metric_name}...", flush=True)
+
+        # Fit descriptor-distance scales consistently for this metric.
+        scales = s4.fit_distance_scales(
+            norm, hist_metric=hist_metric, seed=0
+        )
+
+        for i in range(len(norm)):
+            q = norm.iloc[i]
+
+            descriptor_d = s4.descriptor_distances(
+                q, norm, hist_metric=hist_metric
+            )
+            distances = s4.combined_distance(descriptor_d, scales)
+
+            # Exclude this exact database row, not every shape of its class.
+            distances[i] = np.inf
+            distances[~np.isfinite(distances)] = np.inf
+
+            order = np.argsort(distances, kind="stable")
+            order = order[np.isfinite(distances[order])][:k_eff]
+
+            retrieved_classes = classes[order]
+            relevant_count = int(
+                np.sum(retrieved_classes == classes[i])
+            )
+            returned_count = len(order)
+
+            output_rows.append({
+                "query_class": classes[i],
+                "query_file": files[i],
+                "metric": metric_name,
+                "k": k_eff,
+                "relevant_count": relevant_count,
+                "returned_count": returned_count,
+                "precision_at_k": (
+                    relevant_count / returned_count
+                    if returned_count else 0.0
+                ),
+            })
+
+    details = pd.DataFrame(output_rows)
     s4.OUT.mkdir(parents=True, exist_ok=True)
+
     details_path = s4.OUT / "metric_comparison_per_query.csv"
     details.to_csv(details_path, index=False)
-    summary = (details.groupby(["metric", "k"])["precision_at_k"].agg(["mean", "std", "count"]).reset_index()
-               .rename(columns={"mean": "mean_precision_at_k", "std": "std_precision_at_k", "count": "query_count"}))
+
+    summary = (
+        details.groupby(["metric", "k"])["precision_at_k"]
+        .agg(["mean", "std", "count"])
+        .reset_index()
+        .rename(columns={
+            "mean": "mean_precision_at_k",
+            "std": "std_precision_at_k",
+            "count": "query_count",
+        })
+    )
+
     summary_path = s4.OUT / "metric_comparison_summary.csv"
     summary.to_csv(summary_path, index=False)
-    per_class = (details.groupby(["query_class", "metric", "k"])["precision_at_k"].mean()
-                 .reset_index(name="mean_precision_at_k"))
+
+    per_class = (
+        details.groupby(["query_class", "metric", "k"])["precision_at_k"]
+        .mean()
+        .reset_index(name="mean_precision_at_k")
+    )
+
     class_path = s4.OUT / "metric_comparison_by_class.csv"
     per_class.to_csv(class_path, index=False)
 
-    print("\nprecision on the query shapes")
+    print("\nFull-database Precision@k comparison:")
     print(summary.round(4).to_string(index=False))
-    print(f"\nper query: {details_path}")
-    print(f"summary:   {summary_path}")
-    print(f"per class: {class_path}")
-
+    print(f"\nPer-query results: {details_path}")
+    print(f"Overall summary:   {summary_path}")
+    print(f"Class-wise results:{class_path}")
 
 def main():
     ap = argparse.ArgumentParser(description="Step 4: cosine distance and Earth Mover's Distance")
