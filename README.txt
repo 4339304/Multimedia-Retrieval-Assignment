@@ -8,10 +8,11 @@ Multimedia Retrieval assignment - code for Steps 1 to 6
 2. Install Python 3.12 and the libraries:
        pip install -r requirements.txt
 
-3. Step 1 - view a shape:
+3. Step 1 - viewer, load test and figures:
        python view_mesh.py Data/Bird/D00089.obj --wireframe
    (left-drag: rotate, scroll: zoom, ctrl+left-drag: pan, w: wireframe)
-   The Plotly viewer and the database-wide load test are in step1_read_and_view.ipynb.
+       python run_step1.py                load test of the whole database, the six test shapes (Table 2.1) and the
+                                          figures of Step 1 (shaded and wireframe images, Bird and Hand shading)
 
 4. Step 2 - analysis, resampling, checking and normalization (run in this order):
        python run_step2.py --force        2.1-2.3: statistics and resampling (about 6 minutes)

@@ -1,13 +1,20 @@
-# shape database and generated data (too large for GitHub, recreated by the code)
-Data/*
-!Data/PUT_THE_SHAPE_DATABASE_HERE.txt
+# shape database and processed shapes (too large for GitHub; see README.txt)
+Data/
 processed/
-report/data/*
-!report/data/step3/
-report/data/step3/*
-!report/data/step3/features_step3_2.csv
-!report/data/step3/features_step3_2_summary.csv
-!report/data/step3/step3_2_validation.txt
+
+# figures as written by the figure scripts (the report uses the copies in Images/)
+report/figures/
+
+# index of Step 5 (rebuilt automatically by run_step5.py)
+report/data/step5/ann_index.bin
+report/data/step5/ann_vectors.npy
+
+# LaTeX output
+*.pdf
+*.aux
+*.log
+*.out
+*.toc
 
 # Python
 __pycache__/
