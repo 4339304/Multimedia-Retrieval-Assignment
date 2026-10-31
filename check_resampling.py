@@ -1,7 +1,7 @@
 """Step 2.4: check the resampling of Step 2.3.
 
     python src/check_resampling.py            # uses cached statistics if they exist
-    python src/check_resampling.py --force    # re-read all resampled meshes
+    python src/check_resampling.py --force    # re-read all resampled meshes (about 2 minutes)
 
 Needs the output of Step 2.3 (python src/run_step2.py):
     report/data/step2/resample_log_full.csv   log of the resampling

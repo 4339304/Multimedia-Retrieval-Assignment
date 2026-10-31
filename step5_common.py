@@ -1,5 +1,5 @@
 """
-Step 5: helpers shared by the nearest-neighbour search (run_step5.py) and the t-SNE map (run_step5_tsne.py).
+Step 5: helpers shared by the nearest-neighbor search (run_step5.py) and the t-SNE map (run_step5_tsne.py).
 
 Every shape becomes one vector of 106 values: the six normalized global descriptors and the five histograms
 of Step 4, each divided by the spread rho_g of its distances. The Euclidean distance between two such vectors
@@ -14,8 +14,14 @@ STEP5_DIR = s4.OUT / "step5"
 INDEX_PATH = STEP5_DIR / "ann_index.bin"
 META_PATH = STEP5_DIR / "ann_metadata.csv"
 VECTORS_PATH = STEP5_DIR / "ann_vectors.npy"
-EMBEDDING_PATH = STEP5_DIR / "tsne_embedding.csv"
-PLOT_PATH = STEP5_DIR / "tsne_shapes.html"
+
+
+def embedding_path(perplexity):
+    return STEP5_DIR / f"tsne_embedding_p{perplexity:g}.csv"
+
+
+def plot_path(perplexity):
+    return STEP5_DIR / f"tsne_shapes_p{perplexity:g}.html"
 
 
 def load_step4_data():

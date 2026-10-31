@@ -20,7 +20,7 @@ def list_shapes(data_dir=DATA_DIR) -> pd.DataFrame:
 
 
 def analyze_obj(path) -> dict:
-    """2.1: everything we want to know about one shape, from the *raw* OBJ file.
+    """2.1: everything the analysis measures about one shape, from the *raw* OBJ file.
 
     Topology checks are done on a copy where duplicate vertices (identical coordinates) are
     merged, because edges can only be paired between faces that share vertex indices.

@@ -1,13 +1,26 @@
 
-"""Evaluate HNSW radius retrieval against exact L2 distance filtering."""
+"""
+Step 5: check of the range (radius) query of the index against an exact search.
 
+Run from the project folder (after Step 4 --build):
+    python evaluate_radius.py
+
+Output: report/data/step4/step5/ann_radius_evaluation.csv   per query, radius and candidate limit: shapes within the
+                                                            radius found by the exact search and by the index
+        report/data/step4/step5/ann_radius_results.csv      the shapes themselves
+
+Five database shapes of different classes are queried with the radii 1.0, 1.5 and 2.0 and a candidate list of 200
+shapes or of the whole database. The index has no direct range search, so it returns the nearest candidates and the
+ones within the radius are kept; the exact search filters the distances to all shapes.
+"""
 import time
+
 import numpy as np
 import pandas as pd
 
 import run_step4 as s4
-from step5_common import STEP5_DIR, load_step4_data, query_vector
 from run_step5 import load_index
+from step5_common import STEP5_DIR, query_vector
 
 QUERIES = [
     ("Car", "D00168.obj"),

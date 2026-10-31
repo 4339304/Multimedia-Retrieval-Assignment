@@ -1,5 +1,5 @@
-Multimedia Retrieval assignment - code for Steps 1 to 4
-========================================================
+Multimedia Retrieval assignment - code for Steps 1 to 6
+======================================================
 
 1. Put the shape database in the folder Data/ next to the .py files
    (one sub-folder per class, e.g. Data/Bicycle/D00016.obj).
@@ -42,27 +42,31 @@ Multimedia Retrieval assignment - code for Steps 1 to 4
                                           query with a shape of the database (class/file)
        python run_step4.py --compare      compare the normalization and weighting options (about 1 minute)
        python run_step4_metrics.py --compare
-                                          cosine distance and EMD for the histograms, on the query shapes
+                                          Euclidean, cosine and EMD for the histograms, every database shape as a query
        python figures_step4.py            figures for the report
 
-8. Step 5 - approximate nearest-neighbour search and t-SNE map, needs the normalized features of Step 4:
+8. Step 5 - approximate nearest-neighbor search and t-SNE map, needs the normalized features of Step 4:
        python run_step5.py --build        build the HNSW index of all feature vectors (optional: a query
                                           builds it by itself if it is missing or older than the features)
-       python run_step5.py --query Mug/D00685.obj --compare -k 10
-                                          query the index and compare with the exact search of Step 4
-       python run_step5.py --query HumanHead/D00591.obj --compare -k 10
-       python run_step5.py --query Computer/m1778.obj --compare -k 10
-       python run_step5.py --query Quadruped/D00795.obj --compare -k 10
-       python run_step5.py --query Hand/D01022.obj --compare -k 10
-                                          the other test queries (search time and recall@10)
-       python run_step5.py --query Mug/D00685.obj --radius 2.7 --max-candidates 2473
+       python run_step5.py --query Mug/D00685.obj -k 10
+                                          the K nearest shapes (also a mesh file from outside the database)
+       python run_step5.py --query Mug/D00685.obj --radius 2.0 --max-candidates 2473
                                           all shapes within a radius of the query
-       python run_step5_tsne.py --perplexity 30 --iterations 1000 --seed 42
-                                          t-SNE map (interactive HTML, hover for the shape)
-       python figures_step5.py            figure of the t-SNE map for the report
-   Results: report/data/step4/step5/ (index, query results, t-SNE positions and plot),
-            report/data/step4/3d-shape-feature-database-t-sne-2d-embed.png (t-SNE screenshot),
-            report/data/step4/step5/validation/ (validation logs and screenshot)
+       python run_step5.py --query Mug/D00685.obj --compare -k 10
+                                          search time and recall of the index against an exact search
+       python run_step5.py --evaluate-all -k 10
+                                          the same for every database shape as a query
+       python evaluate_radius.py          radius queries of the index against an exact search
+       python run_step5_tsne.py --perplexity 30
+       python run_step5_tsne.py --perplexity 40
+                                          t-SNE maps (interactive HTML, hover for the shape)
+       python figures_step5.py            figures for the report (t-SNE maps, query results of the index)
+   Results: report/data/step4/step5/ (index, timing and recall, radius tests, t-SNE positions and plots)
+
+9. Step 6 - evaluation, every database shape once as a query (uses the index of Step 5):
+       python run_step6.py                precision of the 10 closest shapes, per class and in total (about 20 s)
+       python figures_step6.py            figures for the report (per-class precision, precision for K, examples)
+   Results: report/data/step6/ (per query, per class, summary, precision and recall for K = 1 .. 50)
 
 Results:
    processed/step2_full/                        resampled shapes (Step 2.3)

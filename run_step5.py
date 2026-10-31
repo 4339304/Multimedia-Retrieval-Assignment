@@ -1,5 +1,5 @@
 """
-Step 5: approximate nearest-neighbour search with an HNSW index (FAISS, faiss-cpu).
+Step 5: approximate nearest-neighbor search with an HNSW index (FAISS, faiss-cpu).
 
 Run from the project folder:
     python run_step5.py --build                                   build the index of the database vectors
@@ -13,7 +13,7 @@ Output: report/data/step4/step5/ann_index.bin, ann_vectors.npy, ann_metadata.csv
         report/data/step4/step5/ann_exact_comparison.csv       time and recall against Step 4
 
 The vectors are those of step5_common.py, so the Euclidean (L2) distance of the index is the distance of
-Step 4. A radius query asks the index for max_candidates neighbours and keeps the ones within the radius.
+Step 4. A radius query asks the index for max_candidates neighbors and keeps the ones within the radius.
 """
 import argparse
 import time
@@ -84,7 +84,7 @@ def ann_query(query_name, k=10, radius=None, max_candidates=200, ef=100):
     rows = []
     for idx, d2 in zip(labels[0], dist_sq[0]):
         idx, d = int(idx), float(np.sqrt(max(float(d2), 0.0)))
-        if idx < 0:                                     # fewer neighbours found than asked for
+        if idx < 0:                                     # fewer neighbors found than asked for
             continue
         if self_idx is not None and idx == self_idx:
             continue
@@ -223,7 +223,7 @@ def evaluate_full_database(k=10, ef=100, repeats=3, batch_size=128):
     index.hnsw.efSearch = max(ef, 50)
 
     # ANN queries are the database vectors themselves.
-    # Request extra neighbours so the query shape can be removed.
+    # Request extra neighbors so the query shape can be removed.
     ann_k = min(n, k + 10)
 
     # Warm up the index and exact-distance calculation.
@@ -282,17 +282,17 @@ def evaluate_full_database(k=10, ef=100, repeats=3, batch_size=128):
     returned = np.zeros(n, dtype=int)
 
     for i in range(n):
-        neighbours = []
+        neighbors = []
         for idx in ann_ids[i]:
             idx = int(idx)
             if idx < 0 or idx == i:
                 continue
-            neighbours.append(idx)
-            if len(neighbours) == k:
+            neighbors.append(idx)
+            if len(neighbors) == k:
                 break
 
-        returned[i] = len(neighbours)
-        recalls[i] = len(set(neighbours) & set(exact_ids[i])) / k
+        returned[i] = len(neighbors)
+        recalls[i] = len(set(neighbors) & set(exact_ids[i])) / k
 
     query_results = meta[["class", "file"]].copy()
     query_results.insert(0, "query_id", np.arange(n))
@@ -353,7 +353,7 @@ def evaluate_full_database(k=10, ef=100, repeats=3, batch_size=128):
     print(f"Class summary:     {class_path}")
 
 def main():
-    ap = argparse.ArgumentParser(description="Step 5: approximate nearest-neighbour search (HNSW)")
+    ap = argparse.ArgumentParser(description="Step 5: approximate nearest-neighbor search (HNSW)")
     ap.add_argument("--build", action="store_true")
     ap.add_argument("--query")
     ap.add_argument("-k", type=int, default=10)

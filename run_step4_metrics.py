@@ -4,7 +4,7 @@ Step 4 (second part): cosine distance and Earth Mover's Distance (EMD) for the h
 Run from the project folder:
     python run_step4_metrics.py --query Mug/D00685.obj -k 5                   both distances
     python run_step4_metrics.py --query Mug/D00685.obj -k 5 --metric emd     one distance
-    python run_step4_metrics.py --compare                                     precision on the query shapes
+    python run_step4_metrics.py --compare                                     every database shape as a query
 
 Output of --compare: report/data/step4/metric_comparison_per_query.csv, metric_comparison_summary.csv,
                      metric_comparison_by_class.csv
@@ -53,7 +53,8 @@ METRICS = {"cosine": cosine_distance, "emd": earth_movers_distance}
 
 # ------------------------------------------------------------------ query and comparison
 def query_with_metric(features, k=5, metric_name="cosine"):
-    """The k database shapes closest to a shape of the feature table, with the chosen histogram distance."""
+    """The k database shapes closest to a query (a row of features, not normalized; a shape of the feature table or
+    a mesh file from outside the database), with the chosen histogram distance."""
     if metric_name not in METRICS:
         raise ValueError(f"unknown distance: {metric_name}")
     if k < 1:
@@ -61,150 +62,56 @@ def query_with_metric(features, k=5, metric_name="cosine"):
     norm, params, _ = s4.load_database()
     hist_metric = METRICS[metric_name]
     scales = s4.fit_distance_scales(norm, hist_metric=hist_metric)
-
-    source = pd.read_csv(s4.FEATURES_CSV)
-    query_class, query_file = str(features["class"]), str(features["file"])
-    match = source[(source["class"].astype(str) == query_class) & (source["file"].astype(str) == query_file)]
-    if match.empty:
-        raise ValueError(f"{query_class}/{query_file} is not in {s4.FEATURES_CSV}")
-    required = s4.GLOBALS + sum(s4.HIST.values(), [])
-    missing = [c for c in required if c not in match.columns]
-    if missing:
-        raise ValueError(f"the feature table has no columns {missing}")
-    q = s4.apply_normalization(match.iloc[[0]][["class", "file"] + required].copy(), params).iloc[0]
-
+    required = ["class", "file"] + s4.GLOBALS + sum(s4.HIST.values(), [])
+    q = s4.apply_normalization(features[required].to_frame().T, params).iloc[0]
     distances = s4.combined_distance(s4.descriptor_distances(q, norm, hist_metric=hist_metric), scales)
-    same_shape = ((norm["class"].astype(str) == query_class) & (norm["file"].astype(str) == query_file)).to_numpy()
-    distances[same_shape] = np.inf                     # the query itself is not a result
-    distances[~np.isfinite(distances)] = np.inf
-    order = np.argsort(distances, kind="stable")
-    order = order[np.isfinite(distances[order])][:min(k, len(norm))]
+    same_shape = ((norm["class"].astype(str) == str(q["class"])) & (norm["file"].astype(str) == str(q["file"]))).to_numpy()
+    distances[same_shape] = np.inf                     # a database shape is not a result of its own query
+    order = np.argsort(distances, kind="stable")[:min(k, len(norm))]
     return pd.DataFrame({"rank": np.arange(1, len(order) + 1), "class": norm["class"].iloc[order].to_numpy(),
                          "file": norm["file"].iloc[order].to_numpy(), "distance": distances[order]})
 
 
-
 def compare_metrics(k=10):
-    """
-    Leave-one-out evaluation on the full feature table.
-    Compares Euclidean, cosine distance and EMD using Precision@k.
-    The query shape itself is excluded from its retrieved results.
-    """
-    table = pd.read_csv(s4.FEATURES_CSV)
-
-    required = {"class", "file"}
-    if not required.issubset(table.columns):
-        raise ValueError("Feature table must contain class and file columns")
-
-    if len(table) < 2:
-        raise ValueError("At least two shapes are required")
-
-    # Use every shape; do not remove the 10 held-out query shapes.
-    table = table.reset_index(drop=True)
-
-    # Fit normalization using the complete evaluation collection.
-    params = s4.fit_normalization(table)
-    norm = s4.apply_normalization(table, params)
-    norm = norm.reset_index(drop=True)
-
+    """Every database shape once as a query (the query itself left out): precision of the k closest shapes with the
+    Euclidean distance, the cosine distance and the EMD for the histograms. Same database and normalization as
+    run_step4.py --compare, so the Euclidean value equals the one of Step 4."""
+    norm, params, _ = s4.load_database()
     classes = norm["class"].astype(str).to_numpy()
     files = norm["file"].astype(str).to_numpy()
-    k_eff = min(k, len(norm) - 1)
-
-    metrics = {
-        "euclidean": s4.euclidean,
-        "cosine": cosine_distance,
-        "emd": earth_movers_distance,
-    }
-
+    k = min(k, len(norm) - 1)
+    metrics = {"euclidean": s4.euclidean, **METRICS}
     output_rows = []
-
-    print(
-        f"Evaluating {len(norm)} shapes with leave-one-out "
-        f"retrieval, Precision@{k_eff}...",
-        flush=True,
-    )
-
+    print(f"{len(norm)} database shapes as queries, precision of the {k} closest shapes ...", flush=True)
     for metric_name, hist_metric in metrics.items():
-        print(f"Evaluating {metric_name}...", flush=True)
-
-        # Fit descriptor-distance scales consistently for this metric.
-        scales = s4.fit_distance_scales(
-            norm, hist_metric=hist_metric, seed=0
-        )
-
+        print(f"  {metric_name}", flush=True)
+        scales = s4.fit_distance_scales(norm, hist_metric=hist_metric)
         for i in range(len(norm)):
-            q = norm.iloc[i]
-
-            descriptor_d = s4.descriptor_distances(
-                q, norm, hist_metric=hist_metric
-            )
-            distances = s4.combined_distance(descriptor_d, scales)
-
-            # Exclude this exact database row, not every shape of its class.
-            distances[i] = np.inf
-            distances[~np.isfinite(distances)] = np.inf
-
-            order = np.argsort(distances, kind="stable")
-            order = order[np.isfinite(distances[order])][:k_eff]
-
-            retrieved_classes = classes[order]
-            relevant_count = int(
-                np.sum(retrieved_classes == classes[i])
-            )
-            returned_count = len(order)
-
-            output_rows.append({
-                "query_class": classes[i],
-                "query_file": files[i],
-                "metric": metric_name,
-                "k": k_eff,
-                "relevant_count": relevant_count,
-                "returned_count": returned_count,
-                "precision_at_k": (
-                    relevant_count / returned_count
-                    if returned_count else 0.0
-                ),
-            })
+            distances = s4.combined_distance(s4.descriptor_distances(norm.iloc[i], norm, hist_metric=hist_metric),
+                                             scales)
+            distances[i] = np.inf                       # the query itself is not a result
+            order = np.argsort(distances, kind="stable")[:k]
+            relevant = int((classes[order] == classes[i]).sum())
+            output_rows.append({"query_class": classes[i], "query_file": files[i], "metric": metric_name, "k": k,
+                                "relevant_count": relevant, "returned_count": k, "precision_at_k": relevant / k})
 
     details = pd.DataFrame(output_rows)
+    summary = (details.groupby(["metric", "k"])["precision_at_k"].agg(["mean", "std", "count"]).reset_index()
+               .rename(columns={"mean": "mean_precision_at_k", "std": "std_precision_at_k", "count": "query_count"}))
+    per_class = (details.groupby(["query_class", "metric", "k"])["precision_at_k"].mean()
+                 .reset_index(name="mean_precision_at_k"))
     s4.OUT.mkdir(parents=True, exist_ok=True)
-
-    details_path = s4.OUT / "metric_comparison_per_query.csv"
-    details.to_csv(details_path, index=False)
-
-    summary = (
-        details.groupby(["metric", "k"])["precision_at_k"]
-        .agg(["mean", "std", "count"])
-        .reset_index()
-        .rename(columns={
-            "mean": "mean_precision_at_k",
-            "std": "std_precision_at_k",
-            "count": "query_count",
-        })
-    )
-
-    summary_path = s4.OUT / "metric_comparison_summary.csv"
-    summary.to_csv(summary_path, index=False)
-
-    per_class = (
-        details.groupby(["query_class", "metric", "k"])["precision_at_k"]
-        .mean()
-        .reset_index(name="mean_precision_at_k")
-    )
-
-    class_path = s4.OUT / "metric_comparison_by_class.csv"
-    per_class.to_csv(class_path, index=False)
-
-    print("\nFull-database Precision@k comparison:")
+    details.to_csv(s4.OUT / "metric_comparison_per_query.csv", index=False)
+    summary.to_csv(s4.OUT / "metric_comparison_summary.csv", index=False)
+    per_class.to_csv(s4.OUT / "metric_comparison_by_class.csv", index=False)
+    print("\nprecision of the closest shapes, every database shape as a query")
     print(summary.round(4).to_string(index=False))
-    print(f"\nPer-query results: {details_path}")
-    print(f"Overall summary:   {summary_path}")
-    print(f"Class-wise results:{class_path}")
+    print(f"saved: {s4.OUT}/metric_comparison_*.csv")
+
 
 def main():
     ap = argparse.ArgumentParser(description="Step 4: cosine distance and Earth Mover's Distance")
-    ap.add_argument("--query", help="shape of the feature table, e.g. Mug/D00685.obj")
+    ap.add_argument("--query", help="mesh file, or class/file of a shape of the feature table")
     ap.add_argument("-k", type=int, default=5)
     ap.add_argument("--metric", choices=["cosine", "emd", "both"], default="both")
     ap.add_argument("--compare", action="store_true")
