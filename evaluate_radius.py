@@ -5,9 +5,9 @@ Step 5: check of the range (radius) query of the index against an exact search.
 Run from the project folder (after Step 4 --build):
     python evaluate_radius.py
 
-Output: report/data/step4/step5/ann_radius_evaluation.csv   per query, radius and candidate limit: shapes within the
+Output: report/data/step5/ann_radius_evaluation.csv   per query, radius and candidate limit: shapes within the
                                                             radius found by the exact search and by the index
-        report/data/step4/step5/ann_radius_results.csv      the shapes themselves
+        report/data/step5/ann_radius_results.csv      the shapes themselves
 
 Five database shapes of different classes are queried with the radii 1.0, 1.5 and 2.0 and a candidate list of 200
 shapes or of the whole database. The index has no direct range search, so it returns the nearest candidates and the

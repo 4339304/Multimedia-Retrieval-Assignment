@@ -4,7 +4,7 @@
 
 1. the four Houses and the PlantIndoors / Tree for which quadric decimation alone fails:
    cleaned original, quadric decimation alone, final result (one shape per row, large)
-2. the two shapes that the area check accepts with a larger Hausdorff distance
+2. the two shapes that keep a larger Hausdorff distance after the decimation
 """
 from pathlib import Path
 

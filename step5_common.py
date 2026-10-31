@@ -10,7 +10,7 @@ import pandas as pd
 
 import run_step4 as s4
 
-STEP5_DIR = s4.OUT / "step5"
+STEP5_DIR = s4.OUT.parent / "step5"            # report/data/step5
 INDEX_PATH = STEP5_DIR / "ann_index.bin"
 META_PATH = STEP5_DIR / "ann_metadata.csv"
 VECTORS_PATH = STEP5_DIR / "ann_vectors.npy"

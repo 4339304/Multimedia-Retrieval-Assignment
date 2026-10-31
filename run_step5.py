@@ -8,9 +8,9 @@ Run from the project folder:
     python run_step5.py --query Mug/D00685.obj --radius 2.7 --max-candidates 2473
                                                                   all shapes closer than the radius
 
-Output: report/data/step4/step5/ann_index.bin, ann_vectors.npy, ann_metadata.csv (index and its vectors)
-        report/data/step4/step5/ann_query_results.csv          result of the last query
-        report/data/step4/step5/ann_exact_comparison.csv       time and recall against Step 4
+Output: report/data/step5/ann_index.bin, ann_vectors.npy, ann_metadata.csv (index and its vectors)
+        report/data/step5/ann_query_results.csv          result of the last query
+        report/data/step5/ann_exact_comparison.csv       time and recall against Step 4
 
 The vectors are those of step5_common.py, so the Euclidean (L2) distance of the index is the distance of
 Step 4. A radius query asks the index for max_candidates neighbors and keeps the ones within the radius.

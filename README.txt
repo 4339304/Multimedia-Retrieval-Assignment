@@ -17,7 +17,7 @@ Multimedia Retrieval assignment - code for Steps 1 to 6
        python run_step2.py --force        2.1-2.3: statistics and resampling (about 6 minutes)
        python check_resampling.py         2.4: check of the resampled database (about 3 minutes)
        python normalize_shapes.py         2.5: centering and scaling (about 8 minutes)
-   Figures and statistics for the report: step2_preprocessing.ipynb
+       python figures_step2_2.py          2.2: histograms of the vertex and face counts, class sizes, smallest/median/largest shapes
        python figures_step2_3.py          large figures of the decimation cases and orientation conflicts
 
 5. Step 3.1 - full normalization (translation, alignment, flipping, scaling), starts from the output of 2.3:
@@ -61,7 +61,7 @@ Multimedia Retrieval assignment - code for Steps 1 to 6
        python run_step5_tsne.py --perplexity 40
                                           t-SNE maps (interactive HTML, hover for the shape)
        python figures_step5.py            figures for the report (t-SNE maps, query results of the index)
-   Results: report/data/step4/step5/ (index, timing and recall, radius tests, t-SNE positions and plots)
+   Results: report/data/step5/ (index, timing and recall, radius tests, t-SNE positions and plots)
 
 9. Step 6 - evaluation, every database shape once as a query (uses the index of Step 5):
        python run_step6.py                precision of the 10 closest shapes, per class and in total (about 20 s)

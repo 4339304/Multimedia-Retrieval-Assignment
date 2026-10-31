@@ -5,8 +5,8 @@ Run from the project folder:
     python run_step5_tsne.py --perplexity 30 --iterations 1000 --seed 42
     python run_step5_tsne.py --perplexity 40            a second map (the technical tips advise 30 to 40)
 
-Output: report/data/step4/step5/tsne_embedding_p30.csv  2D position of every shape (p = perplexity)
-        report/data/step4/step5/tsne_shapes_p30.html    interactive scatterplot, colored by class, with a legend
+Output: report/data/step5/tsne_embedding_p30.csv  2D position of every shape (p = perplexity)
+        report/data/step5/tsne_shapes_p30.html    interactive scatterplot, colored by class, with a legend
 """
 import argparse
 import time
