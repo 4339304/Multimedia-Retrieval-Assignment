@@ -1,0 +1,3 @@
+method,query,k,repeats,mean_search_ms,median_search_ms,returned_10,recall_at_10
+HNSW ANN,Jet/m1147.obj,10,20,0.11785998940467834,0.12290000449866056,10,1.0
+Exact vector search,Jet/m1147.obj,10,20,0.41279002325609326,0.39320008363574743,10,1.0

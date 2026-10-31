@@ -1,0 +1,3 @@
+method,database_shapes,k,repeats,mean_total_ms,median_total_ms,mean_ms_per_query,mean_recall_at_k,queries_with_k_results
+HNSW ANN,2473,10,3,37.72596665658057,35.00470006838441,0.015255142198374674,1.0,2473
+Exact vector search,2473,10,3,199.6250667143613,211.9197000283748,0.08072182236731149,1.0,2473
