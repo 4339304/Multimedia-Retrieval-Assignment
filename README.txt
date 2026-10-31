@@ -68,12 +68,17 @@ Multimedia Retrieval assignment - code for Steps 1 to 6
        python figures_step6.py            figures for the report (per-class precision, precision for K, examples)
    Results: report/data/step6/ (per query, per class, summary, precision and recall for K = 1 .. 50)
 
-Results:
-   processed/step2_full/                        resampled shapes (Step 2.3)
-   processed/step2_normalized/                  centered and scaled shapes (Step 2.5)
-   processed/step3_normalized/                  fully normalized shapes (Step 3.1, input for Step 3.2)
+Results stored in this repository:
    report/data/step3/features_step3_2.csv       feature table (Step 3.2, one row per shape)
    report/data/step4/features_normalized.csv    normalized feature table of the database (Step 4)
    report/data/step4/query_shapes.csv           shapes taken out of the database to be used as queries (Step 4)
-   report/data/                                 other statistics (csv)
-   report/figures/                              figures (copied to Images/ for the report)
+   report/data/                                 other statistics and results of Steps 2 to 6 (csv; t-SNE maps as html)
+   Images/                                      figures of the report
+
+Results written by the scripts, not stored in this repository (too large):
+   processed/step2_full/                        resampled shapes (Step 2.3)
+   processed/step2_normalized/                  centered and scaled shapes (Step 2.5)
+   processed/step3_normalized/                  fully normalized shapes (Step 3.1, input for Step 3.2)
+   report/figures/                              figures as written by the figure scripts (copied to Images/)
+   report/data/step5/ann_index.bin, ann_vectors.npy
+                                                index of Step 5 (rebuilt automatically when missing)
