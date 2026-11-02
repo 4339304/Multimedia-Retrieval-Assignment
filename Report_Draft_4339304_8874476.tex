@@ -676,11 +676,12 @@ number of steps is therefore not fixed in advance but follows from the shape: a 
 than a mesh whose edges all have a similar length. For the refined shapes the number of steps lies between 3 and 47, with a
 median of 28. Because $N_V$ grows roughly with $1/L^2$, one step usually adds about 20\,\% vertices, and 85\,\% of the refined
 shapes end within 10\,\% of $V_{\text{target}}$. Meshes whose edges all have almost the same length, such as a box made of
-equal triangles, can jump further in one step, because all their edges are split at once; the refined shapes end between 5,121
+equal triangles, can jump further in one step, because all their edges are split at once. For 11 refined shapes this jump ends above
+10,000 vertices, and these shapes are then decimated (see below). In the end the refined shapes have between 5,121
 and 9,953 vertices, so all of them are in the accepted range.
 
 \paragraph{Decimation.} Shapes with more than 10,000 vertices are simplified with quadric error metric decimation~[16] from
-Open3D~[9]. The same is done for the few refined shapes that end above 10,000 vertices. Every vertex gets a matrix $Q_v=\sum_p \mathbf p\mathbf p^{\mathsf T}$, summed over the planes
+Open3D~[9]. The same is done for the 11 refined shapes that end above 10,000 vertices. Every vertex gets a matrix $Q_v=\sum_p \mathbf p\mathbf p^{\mathsf T}$, summed over the planes
 $\mathbf p=(a,b,c,d)$ of its neighboring triangles. The method repeatedly merges the two end points of the edge with the lowest
 cost
 \begin{equation}
@@ -742,8 +743,8 @@ memory in the steps that keep larger meshes or many samples in memory.
 \paragraph{Results.} All 2,483 shapes were processed without errors, in about 4 minutes with 8 worker processes. 1,754 shapes
 were refined, 362 decimated and 367 kept. All shapes now have between 5,016 and 9,961 vertices, with a mean of 7,441
 (Table~\ref{tab:s23results}). No shape had to be removed, so the classes still contain 15 to 143 shapes. The refinement hardly
-moves the surface (largest $\delta_H = 0.11\,\%$) and makes the triangle sizes more even. The final result comes from quadric
-decimation for 354 shapes, from quadric decimation with boundary weight for 2 and from vertex clustering for 17. For two trees
+moves the surface (largest $\delta_H = 0.11\,\%$) and makes the triangle sizes more even. Together with the 11 refined shapes, 373 shapes were
+decimated. The final result comes from quadric decimation for 354 of them, from quadric decimation with boundary weight for 2 and from vertex clustering for 17. For two trees
 (D00479 and D00777) none of the three results stayed within 30\,\% area change, so the one with the smallest change was kept;
 for all other decimated shapes the result passed the area check. For most decimated shapes the surface
 moves only a little: $\delta_H$ is below 2.2\,\% for 95\,\% of them. Two shapes, discussed below, keep a larger deviation of
@@ -1821,7 +1822,7 @@ shapes.
 
 The search times were measured for the search alone, with the index and the vectors already in memory, so that both methods are
 timed in the same way. The exact search is a direct computation of all 2,473 distances with NumPy~[5]. For all 2,473 queries
-together, the index needed 38 milliseconds and the exact search 200 milliseconds (mean of three runs on the laptop used), so
+together, the index needed 38 milliseconds and the exact search 200 milliseconds (mean of three runs on the laptop used), or
 about 0.015 against 0.08 milliseconds per query, so the index was about five times faster. In some repeated runs the factor was
 lower, down to about three. For single
 queries the index needed about 0.1 milliseconds and the exact search 0.3 to 1.5 milliseconds. Both are far below the time needed
@@ -1883,7 +1884,7 @@ structure: in both maps six classes form compact groups, namely glasses, compute
 shelves, and most other classes are spread over large parts of the map and overlap. Following the technical tips, dense groups of
 one color indicate classes that a query finds well, and mixed regions classes that are confused with others~[27]. This agrees with
 the evaluation of Step~6: five of the six compact classes are among the eight classes with the highest precision
-(Section~\ref{sec:step6}). The example system of the course uses the same kind of map, colored by class, to judge how well
+(Section~\ref{sec:step6}). The example article of the course, which describes a similar shape retrieval system, uses the same kind of map, colored by class, to judge how well
 the classes are separated~[28]. The map is meant for exploring the database. It does not measure the quality of the retrieval, because
 t-SNE keeps the neighborhoods but changes the large distances.
 
