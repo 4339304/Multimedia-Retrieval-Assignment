@@ -87,3 +87,9 @@ Results written by the scripts, not stored in this repository (too large):
    report/figures/                              figures as written by the figure scripts (copied to Images/)
    report/data/step5/ann_index.bin, ann_vectors.npy
                                                 index of Step 5 (rebuilt automatically when missing)
+
+Shape database used in the report (fully normalized shapes of Step 3.1, 2,483 OBJ files, zip of 550 MB):
+   https://www.dropbox.com/scl/fi/72v22a2c7x0mj27vnwm3i/shape_database_step3_normalized.zip?rlkey=mmhocv8gzn6ib0glzj4i0zyw9&st=9xl5m0ew&dl=0
+   Unzip it in the folder of the .py files; this creates processed/step3_normalized/. With these shapes,
+   Steps 3.2 to 6 can be run without running Steps 2 and 3.1 first, for example:
+       python run_s3_2.py --shape processed/step3_normalized/Mug/D00685.obj
