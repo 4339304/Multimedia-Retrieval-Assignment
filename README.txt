@@ -67,7 +67,11 @@ Multimedia Retrieval assignment - code for Steps 1 to 6
 9. Step 6 - evaluation, every database shape once as a query (uses the index of Step 5):
        python run_step6.py                precision of the 10 closest shapes, per class and in total (about 20 s)
        python figures_step6.py            figures for the report (per-class precision, precision for K, examples)
-   Results: report/data/step6/ (per query, per class, summary, precision and recall for K = 1 .. 50)
+   Results: report/data/step6/ (per query, per class, summary, precision and recall for K = 1 .. 50, and a check
+            with the query kept in the database, which must be found first at distance 0)
+
+10. Demo - two shapes from outside the database (a Jet and a Car) through all steps, one step at a time:
+       see Demo_CBSR/README.txt (the folder contains everything the demo needs)
 
 Results stored in this repository:
    report/data/step3/features_step3_2.csv       feature table (Step 3.2, one row per shape)

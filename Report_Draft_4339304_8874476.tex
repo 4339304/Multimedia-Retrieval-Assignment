@@ -94,53 +94,30 @@
 \end{titlepage}
 
 \section*{Recent Changes}
-Changes compared with the version of 14 October. Steps~2.3 to~3.2 were run again with the changed methods, so their numbers,
-tables and figures changed.
-
-\textbf{General:}
-\begin{itemize}
-  \item New symbols added to the notation table (Section~\ref{sec:notation}) and new tools to the table of tools (SciPy, FAISS,
-  scikit-learn; Section~\ref{sec:tools}).
-\end{itemize}
-
-\textbf{Step 1:}
-\begin{itemize}
-  \item Shading model of the viewer described (one light with an ambient, a diffuse and a specular part; Section~\ref{sec:design1}).
-  \item Shading of the Hand explained (the renderer lights both sides of a face, so the orientation is checked with numbers and
-  not with images; Figure~\ref{fig:handshading}).
-  \item Shading of the Bird explained (smooth shading on a very coarse mesh; the Bird is now shown with flat shading;
-  Figure~\ref{fig:birdshading}).
-\end{itemize}
-
-\textbf{Step 2:}
-\begin{itemize}
-  \item Exact tests for the mesh problems described, together with the fix for each problem (Section~\ref{sec:s21}, Table~\ref{tab:s22quality}).
-  \item Merging of duplicate vertices and parallel processing explained (Section~\ref{sec:resampling}).
-  \item New refinement (the edge length is made smaller step by step until the target is passed; Eq.~\eqref{eq:refineL}).
-  \item New check of the decimation (change of the surface area instead of the Hausdorff distance, which is now only measured;
-  Eq.~\eqref{eq:areachange}). Two shapes keep a larger deviation (Figure~\ref{fig:s23twoshapes}).
-  \item New figure of the orientation conflicts before and after Step~2.3 (Figure~\ref{fig:orientconflicts}).
-  \item Larger figures of the failed decimations, one shape per row (Figures~\ref{fig:s23housesa}--\ref{fig:s23plants}).
-  \item Translation and scaling of Step~2.5 described separately (Section~\ref{sec:s25}).
-\end{itemize}
+Changes compared with the previous version. The methods and all results are unchanged; only explanations were added or corrected,
+and one check was added to Step~6.
 
 \textbf{Step 3:}
 \begin{itemize}
-  \item Step~3.1 now starts from the resampled shapes of Step~2.3 and does all four steps itself (so the shapes are scaled only
-  once; the text explains why Step~2.5 is still a separate step; Section~\ref{sec:normalization}).
-  \item Text of Step~3.1 made more exact (axis-aligned bounding box, normalization as a linear map, shapes with unclear axes; Section~\ref{sec:normalization}).
-  \item Alignment checked for all three axes (Table~\ref{tab:normcheck}, Figure~\ref{fig:normhist}).
-  \item Step~3.2 rewritten (one million samples, 20 bins, hole filling and an estimate for every volume, checks of the values and
-  ranges; Section~\ref{sec:descriptors}).
+  \item Hole filling explained more exactly: the holes are filled on every shape; the 1,249 shapes still count as not closed
+  afterwards because non-manifold edges remain (Section~\ref{sec:descriptors}).
+  \item Idea behind the estimate for impossible volumes explained (Eq.~\eqref{eq:s32_estimate}).
+  \item The shapes stored in two classes are described as part of the ground truth.
 \end{itemize}
 
-\textbf{Step 4:} the first version was added (Section~\ref{sec:step4}).
+\textbf{Step 4:}
+\begin{itemize}
+  \item Reason for the logarithm explained more exactly, including its compression of large values (Section~\ref{sec:s4norm}).
+  \item The weights $w_g=1/\rho_g$ of the distance named explicitly (Eq.~\eqref{eq:s4D}, Section~\ref{sec:s4compare}).
+  \item Distance used in the query figures named in the captions (Figures~\ref{fig:s4queries}, \ref{fig:s5queries} and~\ref{fig:s6examples}).
+  \item Possible combination of the histogram distances mentioned as future work.
+\end{itemize}
 
-\textbf{Step 5:} the first version was added (Section~\ref{sec:step5}).
+\textbf{Step 5:} explanation added why the t-SNE maps for perplexity 30 and 40 are similar (Section~\ref{sec:s5tsne}).
 
-\textbf{Step 6:} the first version was added (Section~\ref{sec:step6}).
+\textbf{Step 6:} reason for leaving the query out of its own result added, and a new check with the query kept in the
+database: every shape is found first, at distance 0 (Sections~\ref{sec:s6metric} and~\ref{sec:s6impl}).
 
-\textbf{Overall discussion and conclusion:} added (Section~\ref{sec:overall}).
 \clearpage
 
 {\small\tableofcontents}
@@ -250,7 +227,7 @@ $N_s$, $B$, $h_j$ & samples per descriptor, number of bins, share of the values 
 $[r_{\min},r_{\max}]$ & range of a histogram & \ref{sec:descriptors}\\
 $\mathcal{G}$, $\varphi_g(M)$, $\hat\varphi_g(M)$ & set of descriptors, feature values of descriptor $g$ before and after normalization & \ref{sec:s4norm}\\
 $\varphi_g^{\min}$, $\varphi_g^{\max}$, $\mu_g$, $\sigma_g$ & smallest and largest value, mean and standard deviation of descriptor $g$ over the database & \ref{sec:s4norm}\\
-$d_g(M_1,M_2)$, $\rho_g$ & distance of two shapes for descriptor $g$, standard deviation of $d_g$ over pairs of database shapes & \ref{sec:s4dist}\\
+$d_g(M_1,M_2)$, $\rho_g$, $w_g$ & distance of two shapes for descriptor $g$, standard deviation of $d_g$ over pairs of database shapes, weight $1/\rho_g$ of descriptor $g$ & \ref{sec:s4dist}\\
 $D(M_1,M_2)$ & distance between two shapes & \ref{sec:s4dist}\\
 $M_q$, $K$ & query shape, number of returned shapes & \ref{sec:s4compare}\\
 $TP$, $FP$, PPV & returned shapes with and without the class of the query, precision & \ref{sec:s4compare}\\
@@ -1112,7 +1089,7 @@ Figure~\ref{fig:normexamples} is one of these shapes. Features that do not depen
 The normalization must not turn faces inside-out. Without the translation, the whole normalization consists of projections
 onto the three axes (dot products), a mirroring of some axes and a uniform scaling. Each of these is linear in the vertex
 positions, so together they are one linear map, a $3\times3$ matrix, and this matrix tells in which direction the normal of
-every face has to point afterwards. The translation is left out because it is not linear; it does not change the normals. The
+every face has to point afterwards. The translation is left out because it does not change the normals. The
 check was done for every face of every shape, with the matrix computed from the vertex positions before and after. None of the
 35.5 million faces points in the wrong direction, also for the 1,262 shapes whose map is a mirroring. Very thin triangles with
 less than $10^{-4}$ of the median triangle area (28,009 faces) were skipped, because their corners are stored with
@@ -1196,9 +1173,14 @@ boundary vertices are $w_1,\ldots,w_m$, in the order in which the faces next to 
 \label{eq:s32_fan}
 \end{equation}
 Each boundary edge is used in the opposite direction from the face next to it, so the fan triangles have the same orientation as
-the rest of the mesh and the normals stay consistent. After the filling, 567 more shapes are
-closed. For 1,249 shapes the mesh is still not closed, mostly because of non-manifold edges (1,059 of them), and
-Eq.~\eqref{eq:s32_volume} gives only an estimate; this is what the slides suggest for surfaces that are not closed~[18].
+the rest of the mesh and the normals stay consistent. The holes are found and filled in the same way for every shape, also for
+shapes with non-manifold edges: a boundary edge belongs to one triangle and a non-manifold edge to three or more, so the two do
+not interfere. A hole can only stay open where its boundary runs through a non-manifold edge or an orientation conflict, because
+there the loop of boundary edges cannot be followed back to its start. After the filling, 567 more shapes are closed. The other
+1,249 shapes still do not count as closed after the filling, in most cases (1,059) because they contain non-manifold edges,
+which the filling does not remove; a mesh is only closed if every edge belongs to exactly two triangles. For these shapes
+Eq.~\eqref{eq:s32_volume}, computed on the filled mesh, gives only an estimate; this is what the slides suggest for surfaces that
+are not closed~[18].
 
 A computed volume is checked against two conditions that every real volume meets:
 \begin{equation}
@@ -1215,7 +1197,12 @@ $\lvert\mathrm{Vol}(M)\rvert$ of the computed volume, limited to the largest val
 \mathrm{Vol}(M)\leftarrow\min\Big(\lvert\mathrm{Vol}(M)\rvert,\;\mathrm{Vol}_{\mathrm{hull}}(M),\;\sqrt{A_c(M)^3/(36\pi)}\Big),
 \label{eq:s32_estimate}
 \end{equation}
-and at least $10^{-12}$, so that no descriptor divides by zero. The estimate can be far from the true volume, but it is in the
+and at least $10^{-12}$, so that no descriptor divides by zero. The idea behind this estimate is that the size of the computed
+volume is still the best available guess, while its sign or part of its value can be wrong because of faces that point the
+wrong way or parts of the surface that are missing. The estimate therefore keeps this size but cuts it at the two largest
+volumes that are physically possible: no shape encloses more than its convex hull, and no shape encloses more than a sphere with
+the same surface area. Of the 160 shapes, 30 were limited by the hull volume and none by the sphere, and one completely flat
+Tree got the lower limit of $10^{-12}$. The estimate can be far from the true volume, but it is in the
 range of possible volumes, and an underestimated or overestimated volume still tells more about the shape than no volume. These
 shapes are marked as ``estimate'' in the feature table, so every shape has all descriptors (Table~\ref{tab:s32_volume}).
 
@@ -1525,7 +1512,8 @@ shapes will be hard to find with a query on another mug.
 
 \subsubsection{Limitations}
 
-The biggest weak point is still the volume. For 1,249 shapes the mesh could not be closed, so their volume is only an estimate.
+The biggest weak point is still the volume. For 1,249 shapes the mesh is not closed even after the hole filling, mostly because
+of non-manifold edges, so their volume is only an estimate.
 The 160 impossible values are replaced by the rough estimate of Eq.~\eqref{eq:s32_estimate}. This estimate is a possible
 volume, but not necessarily the correct one. A computed volume that is wrong but still possible stays in the table
 without being noticed. The 66 shapes
@@ -1543,8 +1531,9 @@ Step~4 therefore uses the logarithm of these values (Section~\ref{sec:s4norm}).
 Finally, it turned out that some shapes are in the database twice. 227 pairs of shapes have almost the same histograms (an
 average difference below 0.02), and the pairs that were checked are the same model, with the same number of faces in the original
 file and the same surface area. In 19 of these pairs the two copies are in different classes; for example, the same airship is
-both in AircraftBuoyant and in Rocket. These copies can make some queries in Step~4 look better than they really are, and the
-copies with two labels can count as errors in the evaluation.
+both in AircraftBuoyant and in Rocket. The copies are part of the database and of its labels, so they are part of the ground
+truth: a copy with the same label counts as a correct result and a copy with another label as a wrong one. Their effect on the
+evaluation is shown in Section~\ref{sec:step6}.
 
 \subsubsection{Conclusion}
 
@@ -1585,10 +1574,16 @@ eccentricity, 90\,\% of the shapes end up in an interval of only 0.005. Standard
 method recommended in the slides and the technical tips~[20,21], so it is used here. The histograms are not changed, because they
 already sum to one, which is the normalization recommended for histograms~[20,21].
 
-Five of the six global descriptors cover several orders of magnitude: besides the eccentricity, the surface area goes from 0.04 to
-15, and the sphericity, rectangularity and convexity of flat shapes go down to between $10^{-20}$ and $10^{-9}$. For these five,
-$\log_{10}\varphi_g(M)$ is standardized instead of the value itself, so that ratios count instead of absolute differences; the
-diameter is standardized directly. Figure~\ref{fig:s4norm} shows the effect and Table~\ref{tab:s4params} the parameters. The
+Five of the six global descriptors cover several orders of magnitude: besides the eccentricity, the surface area goes from 0.04
+to 15. The sphericity, rectangularity and convexity lie between 0 and 1, but for almost flat shapes they come very close
+to 0: the smallest values in the database are $6.9\cdot10^{-21}$, $5.1\cdot10^{-10}$ and $2.6\cdot10^{-9}$. The problem for these
+three is not their range but that many shapes are crowded close to 0. For example, 1,054 shapes have a sphericity below 0.01
+(the median is 0.015), and after a linear standardization all of them would get almost the same value, although their sphericity
+differs by many orders of magnitude. For these five descriptors, $\log_{10}\varphi_g(M)$ is standardized instead of the value
+itself, so that ratios count instead of absolute differences: 0.001 against 0.01 then counts as much as 0.1 against 1. The
+diameter is standardized directly. The logarithm also compresses large values, so that they become more similar to each other
+than small values. For the eccentricity, for example, long and thin shapes become more similar to each other than compact
+shapes. This was accepted because the logarithm clearly improved the retrieval (Section~\ref{sec:s4compare}). Figure~\ref{fig:s4norm} shows the effect and Table~\ref{tab:s4params} the parameters. The
 parameters are computed once on the database and saved, together with the normalized feature table
 (\path{report/data/step4/features_normalized.csv}), which can be inspected with \texttt{python run\_step4.py -{}-show}. A query
 shape is always normalized with these saved parameters.
@@ -1642,7 +1637,8 @@ the standard deviation of $d_g$ over 200,000 random pairs of database shapes (Ta
 D(M_1,M_2)=\sqrt{\sum_{g\in\mathcal{G}}\left(\frac{d_g(M_1,M_2)}{\rho_g}\right)^2},
 \label{eq:s4D}
 \end{equation}
-which is the Euclidean distance between the feature vectors after every descriptor has been divided by $\rho_g$. Because every
+which is the Euclidean distance between the feature vectors after every descriptor has been divided by $\rho_g$. Each descriptor
+is therefore weighted with $w_g=1/\rho_g$, which gives all descriptors the same typical influence on $D$. Because every
 shape has all descriptors (Section~\ref{sec:descriptors}), the same formula is used for all pairs of shapes, without a special
 case for missing values. For a query, $D$ is computed to all database shapes and sorted, and
 the $K$ closest shapes are returned with their distance, in 0.06 seconds per query. As a check of the distance, $D$ of every
@@ -1678,7 +1674,8 @@ Euclidean distance between the full feature vectors; ``weighted descriptors'' is
 \label{tab:s4options}
 \end{table}
 
-The logarithm and the weighting both improve the result, and the global descriptors add a lot compared with the histograms alone.
+The logarithm and the weighting with $w_g=1/\rho_g$ of Eq.~\eqref{eq:s4D} both improve the result, and the global descriptors add
+a lot compared with the histograms alone.
 With the weights, min-max normalization and standardization give the same result, because dividing by $\rho_g$ cancels any linear
 change of a descriptor. All options are far better than a random order, but on average only about three of the ten closest shapes have
 the right class.
@@ -1707,8 +1704,8 @@ is part of Step~5 (Section~\ref{sec:s5search}).
 
 \begin{figure}[!htbp]\centering
 \includegraphics[width=0.92\linewidth]{s4_queries.png}
-\caption{The ten query shapes from outside the database (left, blue) with their five closest database shapes and the distance
-$D$. Green: same class as the query, red: another class. Shapes are shown in their normalized pose; for nearly balanced
+\caption{The ten query shapes from outside the database (left, blue) with their five closest database shapes and the weighted
+Euclidean distance $D$ of Eq.~\eqref{eq:s4D}. Green: same class as the query, red: another class. Shapes are shown in their normalized pose; for nearly balanced
 shapes, such as one bicycle and one motorcycle, the moment test chooses the direction by a very small margin, so they appear
 upside down (Section~\ref{sec:normalization}).}
 \label{fig:s4queries}
@@ -1765,10 +1762,13 @@ Euclidean distance performed best of the tested normalization options and answer
 that histograms are compared bin by bin, so two similar histograms that are shifted by one bin count as different; this is one
 reason why the histograms alone give a low precision. The EMD avoids this problem, but over the whole database it gives the same
 precision as the Euclidean distance (Section~\ref{sec:s4metrics}), so the bin-by-bin comparison is not what limits the system. In
-addition, all descriptors get the same weight although some separate the classes better than others, and the volume-based
+addition, the weights give all descriptors the same typical influence, although some separate the classes better than others, and the volume-based
 descriptors are only estimates for many shapes. Giving every shape a volume, even a rough one, keeps the distance simple, because
-no special case for missing values is needed. The duplicated shapes make the values of Table~\ref{tab:s4options} slightly too
-high.
+no special case for missing values is needed. The duplicated shapes are part of the ground truth: copies with the same label raise
+the values of Table~\ref{tab:s4options} slightly, while classes that contain geometrically very different shapes lower them
+(Section~\ref{sec:step6}). Since no histogram distance is best for all classes, a possible improvement would be to combine them
+without using the class labels, for example by choosing for every query the distance under which its nearest neighbors are most
+clearly separated from the rest of the database. This was not tried here.
 
 % =============================================================================================
 \section{Step 5: Scalability}\label{sec:step5}
@@ -1794,7 +1794,9 @@ computed from the vectors agree with Eq.~\eqref{eq:s4D} up to $6\cdot10^{-6}$, t
 precision.
 
 \subsection{Spatial Search Structure}\label{sec:s5search}
-The vectors are stored in a Hierarchical Navigable Small World (HNSW) graph~[24], built with the FAISS library~[13]. Every
+The vectors are stored in a Hierarchical Navigable Small World (HNSW) graph~[24], built with the FAISS library~[13]. The ANN
+library suggested in the assignment~[1] is written in C++, while the system is written in Python. FAISS offers the same kind of
+approximate search in Python and could be installed on Windows without problems. Every
 vector is a node, linked to some of its nearest neighbors, and the graph has several layers with fewer nodes in the higher
 layers. A search starts in the top layer, moves to the neighbor closest to the query and continues layer by layer, so that only
 a small part of the vectors is compared with the query. The method is approximate: it can miss a true neighbor, and the chance
@@ -1842,7 +1844,7 @@ so the identical results confirm that the index and the vectors are built correc
 \begin{figure}[htbp]\centering
 \includegraphics[width=0.92\linewidth]{s5_queries.png}
 \caption{Five query shapes from outside the database (left, blue) with their five closest database shapes found by the index and
-the distance $D$. Green: same class as the query, red: another class. The lists are identical to those of Step~4
+the weighted Euclidean distance $D$ of Eq.~\eqref{eq:s4D}. Green: same class as the query, red: another class. The lists are identical to those of Step~4
 (Figure~\ref{fig:s4queries}).}
 \label{fig:s5queries}
 \end{figure}
@@ -1880,7 +1882,8 @@ and 40, each in 10 to 25 seconds. The program writes an interactive plot in whic
 and the class and file name of a shape are shown when the mouse is moved over its point.
 
 Figure~\ref{fig:s5tsne} shows both maps. They differ in the position of the groups, which is arbitrary in t-SNE, but not in the
-structure: in both maps six classes form compact groups, namely glasses, computer keyboards, fish, bicycles, human heads and
+structure. This is expected, because the perplexity sets roughly how many neighbors of each point t-SNE tries to keep close, and
+30 and 40 neighbors are almost the same number. In both maps six classes form compact groups, namely glasses, computer keyboards, fish, bicycles, human heads and
 shelves, and most other classes are spread over large parts of the map and overlap. Following the technical tips, dense groups of
 one color indicate classes that a query finds well, and mixed regions classes that are confused with others~[27]. This agrees with
 the evaluation of Step~6: five of the six compact classes are among the eight classes with the highest precision
@@ -1919,7 +1922,11 @@ biased result, because one could pick the shapes for which the system works well
 \subsection{Choice of the Metric}\label{sec:s6metric}
 For a query $M_q$, let $N_c$ be the number of database shapes in its class and $N_{\mathcal{D}}=2{,}473$ the number of database
 shapes. Of the $K$ returned shapes, $TP$ have the class of the query and $FP=K-TP$ do not. The query itself is left out of its
-own result, so the class has $N_c-1$ other shapes, and the shapes of the class that are not returned are $FN=N_c-1-TP$. The main
+own result, so the class has $N_c-1$ other shapes, and the shapes of the class that are not returned are $FN=N_c-1-TP$. Keeping
+the query would also be possible, as long as the counts are normalized in the same way. It is left out because the query is
+always returned first with its own class, which would add one certain correct result to every query without saying anything
+about how well other shapes are found; leaving it out also makes a database query comparable to a query from outside the
+database. That the query is indeed found first is checked separately (Section~\ref{sec:s6impl}). The main
 metric is the precision of the returned shapes, defined in Eq.~\eqref{eq:s4ppv} and in the lecture slides~[22],
 \begin{equation}
 \mathrm{PPV}=\frac{TP}{TP+FP}=\frac{TP}{K},\qquad K=10 .
@@ -1945,7 +1952,7 @@ if all shapes of the class come before all other shapes. The second value is the
 $P_{\mathrm{rand}}=(N_c-1)/(N_{\mathcal{D}}-1)$, which is higher for large classes and shows how much better than chance the system is
 for every class.
 
-\subsection{Implementation}
+\subsection{Implementation}\label{sec:s6impl}
 The script \path{run_step6.py} uses every database shape once as a query of the nearest-neighbor search of Step~5
 (Section~\ref{sec:s5search}). The index uses the same distance as Step~4 (Eq.~\eqref{eq:s4D}). For the first tier it has to
 return up to 141 shapes, so its candidate list is raised from 100 to 142. For every query, the script counts $TP$, $FP$ and $FN$
@@ -1957,6 +1964,12 @@ The results of the index were compared with an exact search over all vectors. Fo
 the same. For the much longer lists of the first tier, the index misses one of 140 shapes for 2 Humanoid queries, which changes
 the average first tier by less than $10^{-4}$. The precision averaged over all queries is 0.325, the same value as the final option
 of Step~4 (Table~\ref{tab:s4options}), which was computed independently with the exact search.
+
+As a check of the whole chain, from the stored features over the normalization and the distance to the index, every database
+shape was also searched with itself kept in the database. For all 2,473 queries the shape itself is the first result, at
+distance 0, and no other shape has a distance of 0, not even the copies of Section~\ref{sec:descriptors}. If the query were
+counted as one of its own ten results, the precision would be 0.401 instead of 0.325, because the query itself would then take
+one of the ten places as a certain correct result.
 
 \subsection{Results}
 Table~\ref{tab:s6summary} gives the averages. On average 3.2 of the ten closest shapes have the class of the query, about 16 times
@@ -2022,7 +2035,7 @@ results of their queries.}
 \begin{figure}[htbp]\centering
 \includegraphics[width=0.92\linewidth]{s6_examples.png}
 \caption{A typical query of the two best classes (HumanHead, Jet) and the two worst classes (Sign, Drum) with its five closest
-shapes and the distance $D$. Green: same class as the query, red: another class.}
+shapes and the weighted Euclidean distance $D$ of Eq.~\eqref{eq:s4D}. Green: same class as the query, red: another class.}
 \label{fig:s6examples}
 \end{figure}
 
@@ -2040,9 +2053,10 @@ the class: the eccentricity of the drums goes from 1.1 to 8.9, so two drums can 
 shapes, and drum queries mostly find heads, wheels, cups and round tables (Figure~\ref{fig:s6examples}). The descriptors of Step~3 capture the general shape, the spread of the vertices and the
 distributions of distances and angles, but not the details that decide the class in these cases. Part of the errors also come
 from the labels. Some classes overlap in meaning, such as Jet, Monoplane and Biplane, or Guitar and Musical\_Instrument, and some
-shapes are in the database twice with two labels (Section~\ref{sec:descriptors}). Copies of the query with the same label raise
-the precision: 405 queries have a copy among their ten closest shapes, and without the copies the average precision is 0.314
-instead of 0.325.
+shapes are in the database twice with two labels (Section~\ref{sec:descriptors}). The copies are part of the ground truth, so
+they are kept in the main results. Copies of the query with the same label raise the precision slightly: 405 queries have a copy
+among their ten closest shapes, and without the copies the average precision is 0.314 instead of 0.325. Classes that
+contain geometrically very different shapes have the opposite effect and lower the precision.
 
 The size of the classes influences the result. A large class has more shapes that can be returned and a higher random baseline,
 and Figure~\ref{fig:s6k}b shows that the large classes are found better. The average over the queries (0.325) therefore gives a
@@ -2093,7 +2107,8 @@ would address this directly. A smaller improvement would be to give the descript
 influence, for example weights chosen to maximize the precision on a part of the database.
 
 The volume-based descriptors are only estimates for many shapes, because most meshes of the database are not closed. The hole
-filling closes small and flat holes, but 1,249 shapes stay open and 160 shapes need a rough estimate (Section~\ref{sec:descriptors}).
+filling closes small and flat holes, but 1,249 shapes are still not closed afterwards, mostly because of non-manifold edges, and
+160 shapes need a rough estimate (Section~\ref{sec:descriptors}).
 A mesh repair method that makes every shape watertight, or a volume computed from a voxelization of the shape, would give more
 reliable values. In a similar way, the distributions are computed from vertices and not from points spread evenly over the
 surface, so finely meshed parts still count more than coarse ones; sampling random points on the surface in proportion to the
@@ -2104,7 +2119,7 @@ Some limitations come from the computing resources. The decimation is accepted b
 but let two shapes keep a deviation of 6 to 9\,\% of the diagonal (Section~\ref{sec:resampling}); a geometric check with more
 memory and time would catch these cases. Other limitations come from the database. The classes are unbalanced, which makes the
 large classes easier to find and the average over the queries higher than the average over the classes, and some shapes are in
-the database twice, sometimes with two different labels. A balanced test set without duplicates would give a fairer evaluation.
+the database twice, sometimes with two different labels. A balanced test set would give a fairer evaluation.
 Finally, the class labels are only an approximation of what a user finds similar, so some results that the evaluation counts as
 wrong, such as a monoplane for a jet, would be acceptable to a user.
 

@@ -9,6 +9,7 @@ Output: report/data/step6/step6_per_query.csv      one row per query shape
         report/data/step6/step6_per_class.csv      mean values per class
         report/data/step6/step6_summary.csv        grand averages over all queries and over all classes
         report/data/step6/step6_precision_by_k.csv mean precision and recall for K = 1 .. 50
+        report/data/step6/step6_self_retrieval.csv check with the query kept in its own result
 
 Every one of the database shapes is used once as a query with the K-nearest-neighbor search of Step 5 (HNSW
 index, the same distance as Step 4); the query itself is left out of its own result (technical tips 6). A returned
@@ -19,6 +20,8 @@ shapes, PPV = TP / K (Module 7). Also stored, for the discussion:
     first tier      precision of a query of length c - 1 (Module 7), which does not depend on a fixed K
     baseline        expected precision of a random order, (c - 1) / (N - 1)
     duplicates      returned shapes that are copies of the query (almost the same histograms, Section 4.2)
+As a separate check of the whole chain (stored features, normalization, distance and index), every database shape is
+also searched with itself kept in the database: it must come back as the first result, at distance 0.
 """
 import argparse
 
@@ -56,6 +59,20 @@ def exact_lists(X, k_max, block=256):
     return rows
 
 
+def self_retrieval(X, classes, index, k, ef):
+    """Every database shape as a query with itself kept in the database: is it the first result, at distance 0?
+    Also the precision of the K results when the query is counted, for comparison with the evaluation."""
+    index.hnsw.efSearch = max(ef, k)
+    dist_sq, labels = index.search(X, k)
+    first = labels[:, 0] == np.arange(len(X))
+    zero = np.sqrt(np.maximum(dist_sq[:, 0], 0)) < 1e-6
+    others_at_zero = int(sum((np.sqrt(np.maximum(d[1:], 0)) < 1e-6).any() for d in dist_sq))
+    precision_kept = float(np.mean([(classes[l[l >= 0]] == classes[i]).mean() for i, l in enumerate(labels)]))
+    return pd.DataFrame([{"queries": len(X), "query_first": int(first.sum()), "query_first_at_distance_0":
+                          int((first & zero).sum()), "other_shapes_at_distance_0": others_at_zero,
+                          "k": k, "precision_with_query_kept": precision_kept}])
+
+
 def duplicate_pairs(norm):
     """Pairs of shapes whose five histograms are almost the same (copies of one model)."""
     H = norm[sum(HIST.values(), [])].to_numpy(float)
@@ -83,6 +100,7 @@ def evaluate(k=10, ef=100):
     agree_k = np.mean([len(set(a[:k]) & set(e[:k])) / k for a, e in zip(lists, exact)])
     agree_tier = np.mean([len(set(a[:ci - 1]) & set(e[:ci - 1])) / (ci - 1) for a, e, ci in zip(lists, exact, c)])
     dup = duplicate_pairs(norm)
+    selfcheck = self_retrieval(X, classes, index, k, ef)
 
     rows, curve = [], np.zeros((n, K_CURVE))
     for i in range(n):
@@ -140,9 +158,12 @@ def evaluate(k=10, ef=100):
     per_class.to_csv(OUT / "step6_per_class.csv", index=False)
     summary.to_csv(OUT / "step6_summary.csv", index=False)
     by_k.to_csv(OUT / "step6_precision_by_k.csv", index=False)
+    selfcheck.to_csv(OUT / "step6_self_retrieval.csv", index=False)
 
     print(f"Step 6: {n} queries, K = {k}")
     print(summary.round(4).to_string(index=False))
+    print("\ncheck with the query kept in the database")
+    print(selfcheck.round(4).to_string(index=False))
     print("\nbest classes")
     print(per_class.head(5)[["class", "shapes", "precision", "first_tier", "baseline"]].round(3).to_string(index=False))
     print("\nworst classes")
