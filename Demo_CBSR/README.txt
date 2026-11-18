@@ -52,16 +52,6 @@ On Windows, the options can be added after the file name, e.g. in a terminal:
    run_demo_windows.bat --only Car
 
 
-Tips for the presentation
--------------------------
-- Do one full test run on the presentation computer before the session: the first run
-  opens the browser and may be slower.
-- Put the terminal and the browser side by side, so the numbers and the pictures are both visible.
-- To record a backup video on Windows: Windows + Alt + R (Xbox Game Bar) or the Snipping Tool.
-- If a browser page does not open, the same pages are in the folder demo_output/ and can be
-  opened by double-clicking.
-
-
 Contents of the folder
 ----------------------
   demo.py                     the demo
